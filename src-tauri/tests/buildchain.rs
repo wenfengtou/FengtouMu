@@ -4,7 +4,7 @@
 //! 早期实现按 `<目录名>.merged.bin` 去找，导致「编译明明成功（exit 0）却报编译失败」。
 //! 真实调用 arduino-cli 的用例标记 `#[ignore]`，本地用 --include-ignored 执行。
 
-use esp32_ide_lib::sim::buildchain::{compile, find_merged_bin, sketch_name};
+use esp32_ide_lib::sim::buildchain::{compile, find_merged_bin, sketch_name, sync_sketch_source};
 use std::path::{Path, PathBuf};
 
 fn tmp_dir(tag: &str) -> PathBuf {
@@ -91,24 +91,55 @@ fn compile_validates_sketch_dir_before_calling_cli() {
     let out = root.join("out");
 
     // 目录不存在
-    let err = compile(&root.join("missing"), "esp32:esp32:esp32", &out).unwrap_err();
+    let err = compile(&root.join("missing"), "esp32:esp32:esp32", &out, None).unwrap_err();
     assert!(err.contains("草图目录不存在"), "实际提示：{err}");
 
     // 目录里没有 .ino
     let no_ino = root.join("no-ino");
     std::fs::create_dir_all(&no_ino).unwrap();
-    let err = compile(&no_ino, "esp32:esp32:esp32", &out).unwrap_err();
+    let err = compile(&no_ino, "esp32:esp32:esp32", &out, None).unwrap_err();
     assert!(err.contains("没有 .ino"), "实际提示：{err}");
 
     // 目录名与 .ino 不同名
     let mismatch = root.join("folder-name");
     std::fs::create_dir_all(&mismatch).unwrap();
     std::fs::write(mismatch.join("other.ino"), b"// x\n").unwrap();
-    let err = compile(&mismatch, "esp32:esp32:esp32", &out).unwrap_err();
+    let err = compile(&mismatch, "esp32:esp32:esp32", &out, None).unwrap_err();
     assert!(err.contains("目录名与 .ino 同名"), "实际提示：{err}");
 
     std::fs::remove_dir_all(&root).ok();
     println!("[3/3] 前置校验提示通过");
+}
+
+#[test]
+fn sync_sketch_source_writes_code_and_backs_up() {
+    let root = tmp_dir("sync");
+    let sketch = fake_sketch(&root, "blink");
+    let ino = sketch.join("blink.ino");
+    let original = std::fs::read_to_string(&ino).unwrap();
+
+    // 内容一致时不写盘、不备份
+    let (path, backup) = sync_sketch_source(&sketch, &original).unwrap();
+    assert_eq!(path, ino);
+    assert!(backup.is_none(), "内容一致时不应产生备份");
+    assert!(!sketch.join("blink.ino.bak").exists());
+
+    // 内容不同时写入并把原文件备份一次
+    let new_code = "void setup(){}\nvoid loop(){ /* 5s */ }\n";
+    let (_, backup) = sync_sketch_source(&sketch, new_code).unwrap();
+    assert_eq!(std::fs::read_to_string(&ino).unwrap(), new_code);
+    let bak = backup.expect("应产生备份");
+    assert_eq!(std::fs::read_to_string(&bak).unwrap(), original);
+
+    // 再改一次不会覆盖已有备份
+    let newer = "void setup(){}\nvoid loop(){ /* 6s */ }\n";
+    let (_, backup2) = sync_sketch_source(&sketch, newer).unwrap();
+    assert!(backup2.is_none(), "已有 .bak 时不再重复备份");
+    assert_eq!(std::fs::read_to_string(&bak).unwrap(), original);
+    assert_eq!(std::fs::read_to_string(&ino).unwrap(), newer);
+
+    std::fs::remove_dir_all(&root).ok();
+    println!("[4/4] 编译前源码落盘与备份通过");
 }
 
 /// 真实调用 arduino-cli 编译 demo 草图（需要本机 arduino-cli + ESP32 核心）。
@@ -126,6 +157,7 @@ fn compiles_demo_sketch_locally() {
         &sketch,
         "esp32:esp32:esp32:FlashMode=dio,FlashFreq=40,FlashSize=4M,PartitionScheme=default,PSRAM=disabled",
         &out,
+        None,
     )
     .expect("编译应成功");
     let merged = r.merged_bin.expect("应给出合并镜像路径");

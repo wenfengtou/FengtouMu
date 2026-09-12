@@ -17,7 +17,7 @@ import {
   pickSketchDir,
   setCode,
 } from "./state/editorStore";
-import { initProject } from "./state/projectStore";
+import { initProject, projectStore } from "./state/projectStore";
 import {
   clearUart,
   initSim,
@@ -43,6 +43,7 @@ function App() {
   const msg = useStore(uiStore, (s) => s.msg);
   const busy = useStore(uiStore, (s) => s.busy);
   const view = useStore(uiStore, (s) => s.view);
+  const fqbn = useStore(projectStore, (s) => s.fqbn);
 
   useEffect(() => {
     initCircuitBridge();
@@ -63,7 +64,7 @@ function App() {
         <button onClick={() => void pickSketchDir()} disabled={busy} title="Arduino 草图目录（含 .ino）">
           草图目录…
         </button>
-        <button onClick={() => void compileCurrent()} disabled={busy} title="用 arduino-cli 编译工程">
+        <button onClick={() => void compileCurrent(fqbn)} disabled={busy} title="用 arduino-cli 编译工程">
           编译
         </button>
         <button onClick={() => void pickFlashFile()} disabled={busy} title="固件镜像（4MB 合并 bin）">

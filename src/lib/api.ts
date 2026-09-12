@@ -42,11 +42,25 @@ export const autoLoadDll = () => invoke<string>("cmd_auto_load_dll");
 /** 注入模拟引脚电压（电位器等），chn 为 ESP32 SAR ADC 通道号，value 为 12 位读数 */
 export const setApin = (chn: number, value: number) =>
   invoke<void>("cmd_set_apin", { chn, value });
-export const compileSketch = (sketchDir: string, outputDir: string, fqbn?: string) =>
-  invoke<{ ok: boolean; merged_bin: string | null; message: string }>("cmd_compile", {
+export const compileSketch = (
+  sketchDir: string,
+  outputDir: string,
+  fqbn?: string,
+  code?: string,
+) =>
+  invoke<{
+    ok: boolean;
+    merged_bin: string | null;
+    message: string;
+    /** 编译前是否把编辑器内容写进了草图目录的主 .ino */
+    synced: boolean;
+    /** 首次覆盖时留下的备份文件路径 */
+    backup: string | null;
+  }>("cmd_compile", {
     sketchDir,
     outputDir,
     fqbn,
+    code,
   });
 /** 读写文本文件（电路图等工程文件） */
 export const readTextFile = (path: string) => invoke<string>("cmd_read_text_file", { path });

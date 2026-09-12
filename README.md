@@ -7,7 +7,7 @@
 ## 特性
 
 - **代码编辑**：Monaco 编辑器，Arduino 语法高亮，内置 LED 闪烁示例
-- **一键编译**：封装 arduino-cli，自动产出 QEMU 可用的 4MB 合并镜像（DIO / 40MHz）
+- **一键编译**：封装 arduino-cli，编译前自动把编辑器内容同步到草图目录的 `.ino`（首次覆盖自动备份为 `.bak`），产出 QEMU 可用的 4MB 合并镜像（DIO / 40MHz）
 - **本地仿真**：ESP32 DevKitC 板卡视图（38 引脚状态、板载 LED=GPIO2、BOOT 按键=GPIO0）、串口终端（UART0 收发）
 - **电路图编辑**：SVG 画布放置元件、拖拽、连线，元件含 LED、电阻、按键、电位器；图纸以 Wokwi 兼容的 `diagram.json` 导入导出
 - **工程文件**：`.fmp` 工程（源码 + 电路图 + 路径配置）可新建 / 打开 / 另存为，带最近工程列表与 30 秒自动保存（异常退出后可恢复）；支持导入导出 Wokwi 兼容 zip
@@ -79,7 +79,8 @@ FengtouMu/
 - 目前仅支持 ESP32（esp32-picsimlab 机型）+ DevKitC 板卡。
 - 电路图中的 LED 与电阻已实测可由固件驱动；按键按下时界面与注入链路正常，但固件以 `INPUT_PULLUP` 读取时低电平无法稳定保持（QEMU 模型侧限制），运行期"按键改变固件行为"待继续定位；电位器经 `cmd_set_apin` 注入 ADC 读数的链路已实测可用（现有 demo 固件未使用 ADC，故仅验证注入无报错）。
 - 工程文件保存的是内容与路径配置；电路图里元件的绝对位置会一并存下，但元件之间暂无自动布局（新增元件按固定步进叠加）。
-- CI 只跑不需要 QEMU 的用例：`sim_integration` 与 `button_injection` 需要本机 `lib/qemu` 与固件镜像，已标记 `#[ignore]`，请用 `npm run test:rust:local` 在本地执行。
+- 串口输出按波特率模拟、明显滞后：固件 setup 里的 `Serial.println` 可能要等 20–40 秒才出现在终端，属 QEMU 模型行为；仿真运行约 20 秒后固件可能偶发崩溃重启（模型侧问题，待定位）。
+- CI 只跑不需要 QEMU 的用例：`sim_integration`、`button_injection`、`user_sketch_blink`、`buildchain::compiles_demo_sketch_locally` 需要本机 `lib/qemu`、固件镜像或 arduino-cli，已标记 `#[ignore]`，请用 `npm run test:rust:local` 在本地执行。
 
 ## 第三方组件与许可
 

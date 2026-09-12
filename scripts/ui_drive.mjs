@@ -582,9 +582,12 @@ async function stageCompile() {
     last = p.msg;
     if (last.includes("正在编译")) sawCompiling = true;
     if (sawCompiling && last.includes("编译成功")) {
-      log(`H 编译: 成功 → flash=${p.flash}`);
+      log(`H 编译: 成功 → flash=${p.flash} | ${last.slice(0, 160)}`);
       if (!p.flash.endsWith(".ino.merged.bin")) {
         return { ok: false, why: `固件路径未指向合并镜像：${p.flash}` };
+      }
+      if (!last.includes("已同步到草图目录")) {
+        return { ok: false, why: `编译提示里没有"编辑器内容已同步到草图目录"：${last.slice(0, 200)}` };
       }
       return { ok: true };
     }

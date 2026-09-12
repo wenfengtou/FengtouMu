@@ -41,15 +41,22 @@ export async function pickFlashFile(): Promise<void> {
   if (typeof file === "string") editorStore.set({ flashPath: file });
 }
 
-export async function compileCurrent(): Promise<void> {
-  const { sketchDir } = editorStore.get();
+/** 一键编译：把编辑器内容与（可选）工程 fqbn 交给编译链 */
+export async function compileCurrent(fqbn?: string): Promise<void> {
+  const { sketchDir, code } = editorStore.get();
   setBusy(true);
   setMsg("正在编译…（首次约 1-3 分钟）");
   try {
-    const r = await compileSketch(sketchDir, DEFAULT_OUT);
+    // 把编辑器里的代码一并交给编译链：编译前会写入草图目录的主 .ino，
+    // 避免"改了代码但编出来还是旧固件"。
+    const r = await compileSketch(sketchDir, DEFAULT_OUT, fqbn?.trim() || undefined, code);
     if (r.ok && r.merged_bin) {
       editorStore.set({ flashPath: r.merged_bin });
-      setMsg(`编译成功：${r.merged_bin}`);
+      const syncNote = r.synced ? "（编辑器内容已同步到草图目录" : "";
+      const backupNote = r.backup ? `，原文件备份为 ${r.backup}` : "";
+      setMsg(
+        `编译成功：${r.merged_bin}${syncNote}${backupNote}${r.synced ? "）" : ""}`,
+      );
     } else {
       setMsg(`编译未产出镜像：${r.message}`);
     }
