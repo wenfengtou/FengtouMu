@@ -22,6 +22,8 @@ const TYPE_TO_FILE: Record<PartType, string> = {
   led: "wokwi-led",
   resistor: "wokwi-resistor",
   pushbutton: "wokwi-pushbutton",
+  switch: "wokwi-slide-switch",
+  buzzer: "wokwi-buzzer",
   potentiometer: "wokwi-potentiometer",
 };
 
@@ -36,6 +38,11 @@ const TYPE_ALIASES: Record<string, PartType> = {
   "wokwi-pushbutton": "pushbutton",
   "wokwi-pushbutton-6mm": "pushbutton",
   pushbutton: "pushbutton",
+  "wokwi-slide-switch": "switch",
+  "wokwi-dip-switch-4": "switch",
+  switch: "switch",
+  "wokwi-buzzer": "buzzer",
+  buzzer: "buzzer",
   "wokwi-potentiometer": "potentiometer",
   potentiometer: "potentiometer",
 };
@@ -46,8 +53,24 @@ const PIN_ALIASES: Record<PartType, Record<string, string>> = {
   led: {},
   resistor: { "1": "a", "2": "b" },
   pushbutton: { "1": "A", "2": "B", "1.l": "A", "1.r": "B", "2.l": "A", "2.r": "B" },
+  switch: {},
+  buzzer: {},
   potentiometer: { "1": "VCC", "2": "SIG", "3": "GND" },
 };
+
+/** Wokwi 拨动开关的开关位置（嵌套 attrs.switch.position）与内部 closed 互转 */
+function switchClosedFromRaw(attrsRaw: Record<string, unknown>): 0 | 1 {
+  const nested = attrsRaw.switch;
+  if (typeof nested === "object" && nested !== null) {
+    const pos = (nested as Record<string, unknown>).position;
+    if (pos === 1) return 1;
+  }
+  return attrsRaw.closed === 1 ? 1 : 0;
+}
+
+function switchAttrsToRaw(attrs: Record<string, string | number> | undefined) {
+  return { switch: { position: Number(attrs?.closed) === 1 ? 1 : 0 } };
+}
 
 export function serializeDiagram(diagram: Diagram): string {
   const parts = diagram.parts.map((p) => ({
@@ -55,7 +78,11 @@ export function serializeDiagram(diagram: Diagram): string {
     id: p.id,
     top: Math.round(p.y),
     left: Math.round(p.x),
-    ...(p.attrs && Object.keys(p.attrs).length > 0 ? { attrs: p.attrs } : {}),
+    ...(p.type === "switch"
+      ? { attrs: switchAttrsToRaw(p.attrs) }
+      : p.attrs && Object.keys(p.attrs).length > 0
+        ? { attrs: p.attrs }
+        : {}),
   }));
   const connections = diagram.connections.map((c) => [
     pinKey(c.from),
@@ -128,6 +155,10 @@ export function parseDiagram(text: string): ParseResult {
     const attrs: Record<string, string | number> = {};
     for (const [k, v] of Object.entries(attrsRaw)) {
       if (typeof v === "string" || typeof v === "number") attrs[k] = v;
+    }
+    if (type === "switch") {
+      // Wokwi 拨动开关用嵌套 attrs.switch.position 表示位置，内部统一为 closed
+      attrs.closed = switchClosedFromRaw(attrsRaw);
     }
     parts.push({
       id,

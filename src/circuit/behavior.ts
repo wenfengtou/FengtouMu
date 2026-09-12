@@ -6,7 +6,7 @@
  */
 
 import { boardPinByGpio } from "./catalog";
-import { netGpios, netHasGnd, type Netlist } from "./netlist";
+import { netGpios, netHasGnd, netOfPin, type Netlist } from "./netlist";
 import type { BoardPinState, Diagram, PinRef } from "./types";
 
 /**
@@ -52,6 +52,8 @@ export function adcRaw(fraction: number): number {
 export type PartVisual =
   | { kind: "led"; lit: boolean; color: string }
   | { kind: "pushbutton"; pressed: boolean }
+  | { kind: "switch"; closed: boolean }
+  | { kind: "buzzer"; on: boolean }
   | { kind: "potentiometer"; value: number }
   | { kind: "resistor"; value: string };
 
@@ -99,13 +101,34 @@ export function sunkLow(
   return netHasGnd(netlist, ref) || boardStateOf(netlist, ref, pins, (s) => s.value === 0);
 }
 
+/** 两端元件是否被供电：一端被拉高、另一端被拉低（允许反接） */
+function twoPinPowered(
+  netlist: Netlist,
+  a: PinRef,
+  b: PinRef,
+  pins: Map<number, BoardPinState>,
+): boolean {
+  return (
+    (drivenHigh(netlist, a, pins) && sunkLow(netlist, b, pins)) ||
+    (drivenHigh(netlist, b, pins) && sunkLow(netlist, a, pins))
+  );
+}
+
 function ledLit(input: BehaviorInput, ledId: string): boolean {
   const { netlist, pins } = input;
   const anode: PinRef = { part: ledId, pin: "A" };
   const cathode: PinRef = { part: ledId, pin: "C" };
-  if (drivenHigh(netlist, anode, pins) && sunkLow(netlist, cathode, pins)) return true;
-  // 反接也点亮，避免学生接反时"完全没反应"
-  return drivenHigh(netlist, cathode, pins) && sunkLow(netlist, anode, pins);
+  return twoPinPowered(netlist, anode, cathode, pins);
+}
+
+function buzzerOn(input: BehaviorInput, buzzerId: string): boolean {
+  const { netlist, pins } = input;
+  return twoPinPowered(
+    netlist,
+    { part: buzzerId, pin: "1" },
+    { part: buzzerId, pin: "2" },
+    pins,
+  );
 }
 
 export function computeVisuals(input: BehaviorInput): Map<string, PartVisual> {
@@ -121,6 +144,12 @@ export function computeVisuals(input: BehaviorInput): Map<string, PartVisual> {
         break;
       case "pushbutton":
         out.set(part.id, { kind: "pushbutton", pressed: input.pressed === part.id });
+        break;
+      case "switch":
+        out.set(part.id, { kind: "switch", closed: Number(part.attrs?.closed) === 1 });
+        break;
+      case "buzzer":
+        out.set(part.id, { kind: "buzzer", on: buzzerOn(input, part.id) });
         break;
       case "potentiometer": {
         const raw = input.potValues[part.id];
@@ -166,6 +195,45 @@ export function buttonInjection(
       const def = boardPinByGpio(gpio);
       if (def?.boardPin === undefined) continue;
       return { boardPin: def.boardPin, gpio, value: pressed ? 0 : 1 };
+    }
+  }
+  return null;
+}
+
+/**
+ * 拨动开关闭合/断开时应当注入的引脚电平。
+ * 参考电气语义：开关接到 VCC 侧时闭合与断开都读高；接到 GND 侧时闭合拉低、
+ * 断开回高（与按键的上拉语义一致）；无电源/地参考时默认闭合高、断开低。
+ */
+export function switchInjection(
+  input: BehaviorInput,
+  partId: string,
+  closed: boolean,
+): PinInjection | null {
+  const { netlist } = input;
+  const refs: PinRef[] = [
+    { part: partId, pin: "1" },
+    { part: partId, pin: "2" },
+  ];
+  const refHas = (
+    want: (net: { hasVcc: boolean; hasGnd: boolean; pullUp: boolean; pullDown: boolean }) => boolean,
+  ): boolean =>
+    refs.some((r) => {
+      const net = netOfPin(netlist, r);
+      return !!net && want(net);
+    });
+  const hasVcc = refHas((n) => n.hasVcc || n.pullUp);
+  const hasGnd = refHas((n) => n.hasGnd || n.pullDown);
+  let value: 0 | 1;
+  if (hasVcc) value = 1;
+  else if (hasGnd) value = closed ? 0 : 1;
+  else value = closed ? 1 : 0;
+
+  for (const ref of refs) {
+    for (const gpio of netGpios(netlist, ref)) {
+      const def = boardPinByGpio(gpio);
+      if (def?.boardPin === undefined) continue;
+      return { boardPin: def.boardPin, gpio, value };
     }
   }
   return null;

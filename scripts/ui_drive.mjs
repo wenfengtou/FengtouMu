@@ -598,6 +598,43 @@ async function stageCompile() {
   return { ok: false, why: `编译超时，最后提示：${last.slice(0, 200)}` };
 }
 
+/** I. 电路图 + 拨动开关：放置、连线、运行、切换开合，断言界面状态与注入链路 */
+async function stageCircuitSwitch() {
+  await openTab("电路图");
+  await ensureStopped();
+  await clickSel('[data-part-type="switch"]');
+  const wires0 = (await ui()).wires;
+  await clickSel('[data-pin="tgl1:1"]');
+  await clickSel('[data-pin="esp:GPIO0"]');
+  await clickSel('[data-pin="tgl1:2"]');
+  await clickSel('[data-pin="esp:GND.1"]');
+  const p0 = await ui();
+  log(`I 开关: 导线 ${wires0} → ${p0.wires} 条`);
+  if (p0.wires !== wires0 + 2) return { ok: false, why: `开关连线失败（导线数 ${p0.wires}）` };
+
+  const r = await runOnce("I 开关");
+  if (!r.ok) return r;
+
+  const c = await pointOnPart("tgl1", [0.4, 0.5, 0.6, 0.7]);
+  await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: c.x, y: c.y });
+  await send("Input.dispatchMouseEvent", { type: "mousePressed", x: c.x, y: c.y, button: "left", clickCount: 1 });
+  await sleep(250);
+  await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: c.x, y: c.y, button: "left", clickCount: 1 });
+  await sleep(300);
+
+  const closed = await evalJs(
+    `document.querySelector('[data-part="tgl1"]')?.getAttribute('data-closed')`,
+  );
+  const msg = (await ui()).msg;
+  log(`I 开关: 切换后 data-closed=${closed} 提示="${msg}"`);
+
+  const stop = await stopOnce("I 开关");
+  if (!stop.ok) return stop;
+  if (closed !== "1") return { ok: false, why: `切换开关后 data-closed=${closed}（应为 1）` };
+  if (/注入失败/.test(msg)) return { ok: false, why: `注入报错：${msg}` };
+  return { ok: true };
+}
+
 // ===== 主流程 =====
 seedAutosave();
 killApp();
@@ -645,6 +682,7 @@ const stages = [
   ["F 工程工具条", stageProjectBar],
   ["G 环境自检", stageEnvCheck],
   ["H 一键编译", stageCompile],
+  ["I 电路图开关", stageCircuitSwitch],
 ];
 
 const failed = [];
@@ -666,5 +704,5 @@ if (failed.length > 0) {
   failed.forEach((f) => log("  - " + f));
   process.exit(2);
 }
-log("UI 自动化验证通过：板卡 LED、电路图 LED、按键注入、电位器注入、工程新建、环境自检、自动保存恢复、一键编译 八条链路全部成功");
+log("UI 自动化验证通过：板卡 LED、电路图 LED、按键注入、电位器注入、拨动开关、工程新建、环境自检、自动保存恢复、一键编译 九条链路全部成功");
 process.exit(0);

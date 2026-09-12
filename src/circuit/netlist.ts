@@ -6,7 +6,7 @@
  */
 
 import { CATALOG, pinDef } from "./catalog";
-import { pinKey, type Diagram, type PinRef } from "./types";
+import { pinKey, type Diagram, type Part, type PinRef } from "./types";
 
 export interface Net {
   id: number;
@@ -17,6 +17,10 @@ export interface Net {
   gpios: number[];
   hasGnd: boolean;
   hasVcc: boolean;
+  /** 通过电阻（而非直接导线）接到 VCC，属于弱上拉 */
+  pullUp: boolean;
+  /** 通过电阻（而非直接导线）接到 GND，属于弱下拉 */
+  pullDown: boolean;
 }
 
 export interface Netlist {
@@ -47,6 +51,42 @@ class UnionFind {
   }
 }
 
+/** 该元件当前是否电气透传（两端导通）：电阻恒透传，拨动开关仅在闭合时透传 */
+function isPassThrough(part: Part): boolean {
+  const def = CATALOG[part.type];
+  if (def.passThrough && def.pins.length === 2) return true;
+  if (part.type === "switch" && def.pins.length === 2 && Number(part.attrs?.closed) === 1) {
+    return true;
+  }
+  return false;
+}
+
+/** 收集一个"线段组"（仅按导线合并）的电源/地属性 */
+function groupPower(
+  uf: UnionFind,
+  pinByKey: Map<string, PinRef>,
+  partById: Map<string, Part>,
+): Map<string, { hasVcc: boolean; hasGnd: boolean }> {
+  const groups = new Map<string, { hasVcc: boolean; hasGnd: boolean }>();
+  for (const key of pinByKey.keys()) {
+    const root = uf.find(key);
+    let g = groups.get(root);
+    if (!g) {
+      g = { hasVcc: false, hasGnd: false };
+      groups.set(root, g);
+    }
+    const ref = pinByKey.get(key);
+    if (!ref) continue;
+    const part = partById.get(ref.part);
+    if (!part) continue;
+    const def = pinDef(part.type, ref.pin);
+    if (!def) continue;
+    if (def.kind === "vcc") g.hasVcc = true;
+    if (def.kind === "gnd") g.hasGnd = true;
+  }
+  return groups;
+}
+
 export function buildNetlist(diagram: Diagram): Netlist {
   const uf = new UnionFind();
   const pinByKey = new Map<string, PinRef>();
@@ -61,37 +101,68 @@ export function buildNetlist(diagram: Diagram): Netlist {
     }
   }
 
-  // 2) 导线合并
+  // 2) 导线合并（暂不含透传元件，先得到"线段组"）
   for (const conn of diagram.connections) {
     const a = pinKey(conn.from);
     const b = pinKey(conn.to);
     if (pinByKey.has(a) && pinByKey.has(b)) uf.union(a, b);
   }
 
-  // 3) 无源两端元件透传（电阻等）
+  // 3) 透传元件（电阻、闭合开关）：
+  //    先记录"一端接 VCC/GND、另一端接电路"的上/下拉语义，再合并两端网络
+  const groups = groupPower(uf, pinByKey, partById);
+  const pullUpRoots = new Set<string>();
+  const pullDownRoots = new Set<string>();
   for (const part of diagram.parts) {
+    if (!isPassThrough(part)) continue;
     const def = CATALOG[part.type];
-    if (def.passThrough && def.pins.length === 2) {
-      const a = pinKey({ part: part.id, pin: def.pins[0].id });
-      const b = pinKey({ part: part.id, pin: def.pins[1].id });
-      if (pinByKey.has(a) && pinByKey.has(b)) uf.union(a, b);
+    const a = pinKey({ part: part.id, pin: def.pins[0].id });
+    const b = pinKey({ part: part.id, pin: def.pins[1].id });
+    if (!pinByKey.has(a) || !pinByKey.has(b)) continue;
+    const ra = uf.find(a);
+    const rb = uf.find(b);
+    if (ra !== rb) {
+      const ga = groups.get(ra);
+      const gb = groups.get(rb);
+      if (ga && gb) {
+        if (ga.hasVcc && !gb.hasVcc) pullUpRoots.add(rb);
+        if (gb.hasVcc && !ga.hasVcc) pullUpRoots.add(ra);
+        if (ga.hasGnd && !gb.hasGnd) pullDownRoots.add(rb);
+        if (gb.hasGnd && !ga.hasGnd) pullDownRoots.add(ra);
+      }
+      uf.union(a, b);
+      // 合并后把被并入组的语义带到新根上
+      const newRoot = uf.find(a);
+      const oldRoot = newRoot === ra ? rb : ra;
+      if (pullUpRoots.has(oldRoot)) pullUpRoots.add(newRoot);
+      if (pullDownRoots.has(oldRoot)) pullDownRoots.add(newRoot);
     }
   }
 
   // 4) 归并成网络
-  const groups = new Map<string, string[]>();
+  const finalGroups = new Map<string, string[]>();
   for (const key of pinByKey.keys()) {
     const root = uf.find(key);
-    const list = groups.get(root);
+    const list = finalGroups.get(root);
     if (list) list.push(key);
-    else groups.set(root, [key]);
+    else finalGroups.set(root, [key]);
   }
 
   const nets: Net[] = [];
   const netOf = new Map<string, number>();
   let id = 0;
-  for (const nodes of groups.values()) {
-    const net: Net = { id, nodes, boardPins: [], gpios: [], hasGnd: false, hasVcc: false };
+  for (const nodes of finalGroups.values()) {
+    const root = uf.find(nodes[0]);
+    const net: Net = {
+      id,
+      nodes,
+      boardPins: [],
+      gpios: [],
+      hasGnd: false,
+      hasVcc: false,
+      pullUp: pullUpRoots.has(root),
+      pullDown: pullDownRoots.has(root),
+    };
     for (const key of nodes) {
       const ref = pinByKey.get(key);
       if (!ref) continue;
@@ -142,4 +213,23 @@ export function netNodes(netlist: Netlist, ref: PinRef): PinRef[] {
   return net.nodes
     .map((k) => netlist.pinByKey.get(k))
     .filter((r): r is PinRef => r !== undefined);
+}
+
+/**
+ * 网络的电阻上/下拉语义：
+ *   - "pullup"   ：通过电阻接到 VCC（弱上拉，GPIO 空闲读高）
+ *   - "pulldown" ：通过电阻接到 GND（弱下拉，GPIO 空闲读低）
+ *   - "divider"  ：同时接上拉与下拉电阻（电阻分压节点）
+ *   - null       ：无电阻偏置
+ */
+export function netPullLevel(
+  netlist: Netlist,
+  ref: PinRef,
+): "pullup" | "pulldown" | "divider" | null {
+  const net = netOfPin(netlist, ref);
+  if (!net) return null;
+  if (net.pullUp && net.pullDown) return "divider";
+  if (net.pullUp) return "pullup";
+  if (net.pullDown) return "pulldown";
+  return null;
 }

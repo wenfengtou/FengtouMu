@@ -4,9 +4,9 @@
  *   - 按键/电位器操作 → 向引擎注入电平或模拟量
  */
 
-import { buttonInjection, potInjection } from "../circuit/behavior";
+import { buttonInjection, potInjection, switchInjection } from "../circuit/behavior";
 import { setApin } from "../lib/api";
-import { behaviorInput, circuitStore, recompute } from "./circuitStore";
+import { behaviorInput, circuitStore, recompute, togglePart as storeTogglePart } from "./circuitStore";
 import { simStore, writePin } from "./simStore";
 import { setMsg } from "./uiStore";
 
@@ -34,6 +34,17 @@ export async function pressPart(partId: string, pressed: boolean): Promise<void>
   const injection = buttonInjection(behaviorInput(), partId, pressed);
   if (!injection) {
     if (pressed) setMsg("按键未连接到 GPIO 引脚，仅显示按下状态");
+    return;
+  }
+  await writePin(injection.boardPin, injection.value);
+}
+
+/** 拨动开关切换：先更新图纸状态与网表，再向引擎注入对应电平 */
+export async function togglePart(partId: string, closed: boolean): Promise<void> {
+  storeTogglePart(partId, closed);
+  const injection = switchInjection(behaviorInput(), partId, closed);
+  if (!injection) {
+    if (closed) setMsg("开关未连接到 GPIO 引脚，仅更新开合状态");
     return;
   }
   await writePin(injection.boardPin, injection.value);

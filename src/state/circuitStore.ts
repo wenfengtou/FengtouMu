@@ -1,5 +1,6 @@
 /** 电路域：图纸数据、网表、元件外观、选中与连线状态 */
 
+import { CATALOG } from "../circuit/catalog";
 import { computeVisuals, type BehaviorInput, type PartVisual } from "../circuit/behavior";
 import { parseDiagram, serializeDiagram } from "../circuit/diagram";
 import { buildNetlist, type Netlist } from "../circuit/netlist";
@@ -69,16 +70,66 @@ export function recompute(): void {
 
 function nextId(diagram: Diagram, type: PartType): string {
   const prefix =
-    type === "led" ? "led" : type === "resistor" ? "r" : type === "pushbutton" ? "sw" : "pot";
+    type === "led"
+      ? "led"
+      : type === "resistor"
+        ? "r"
+        : type === "pushbutton"
+          ? "sw"
+          : type === "switch"
+            ? "tgl"
+            : type === "buzzer"
+              ? "bz"
+              : "pot";
   let n = 1;
   const ids = new Set(diagram.parts.map((p) => p.id));
   while (ids.has(`${prefix}${n}`)) n += 1;
   return `${prefix}${n}`;
 }
 
+/**
+ * 元件自动布局：在底板右侧按列扫描空位，返回第一个不与现有元件重叠的坐标。
+ * 替代原先"固定步进叠加"的放法，连续添加多个元件也不会互相压盖。
+ */
+const SLOT_COLS = [340, 500, 660, 820, 980];
+const SLOT_ROW_START = 80;
+const SLOT_ROW_STEP = 130;
+const SLOT_MARGIN = 24;
+
+export function nextSlot(diagram: Diagram): { x: number; y: number } {
+  const occupied = diagram.parts.map((p) => {
+    const def = CATALOG[p.type];
+    return {
+      x0: p.x - SLOT_MARGIN,
+      y0: p.y - SLOT_MARGIN,
+      x1: p.x + def.w + SLOT_MARGIN,
+      y1: p.y + def.h + SLOT_MARGIN,
+    };
+  });
+  const overlaps = (x: number, y: number, w: number, h: number): boolean =>
+    occupied.some((o) => x < o.x1 && x + w > o.x0 && y < o.y1 && y + h > o.y0);
+  for (const col of SLOT_COLS) {
+    for (let row = 0; row < 24; row += 1) {
+      const x = col;
+      const y = SLOT_ROW_START + row * SLOT_ROW_STEP;
+      if (!overlaps(x, y, 40, 40)) return { x, y };
+    }
+  }
+  // 兜底：回到首列继续往下偏移
+  let y = SLOT_ROW_START;
+  while (overlaps(SLOT_COLS[0], y, 40, 40)) y += SLOT_ROW_STEP;
+  return { x: SLOT_COLS[0], y };
+}
+
 export function addPart(type: PartType, x: number, y: number): string {
   const id = nextId(circuitStore.get().diagram, type);
-  const part = { id, type, x: Math.round(x), y: Math.round(y) };
+  const part = {
+    id,
+    type,
+    x: Math.round(x),
+    y: Math.round(y),
+    ...(type === "switch" ? { attrs: { closed: 0 } as Record<string, string | number> } : {}),
+  };
   circuitStore.set((prev) => ({
     diagram: { ...prev.diagram, parts: [...prev.diagram.parts, part] },
     selected: id,
@@ -87,6 +138,21 @@ export function addPart(type: PartType, x: number, y: number): string {
   }));
   recompute();
   return id;
+}
+
+/** 切换拨动开关开合：写入 attrs 并重新建网（闭合时两端导通），再向引擎注入电平 */
+export function togglePart(partId: string, closed: boolean): void {
+  circuitStore.set((prev) => ({
+    diagram: {
+      ...prev.diagram,
+      parts: prev.diagram.parts.map((p) =>
+        p.id === partId
+          ? { ...p, attrs: { ...(p.attrs ?? {}), closed: closed ? 1 : 0 } }
+          : p,
+      ),
+    },
+  }));
+  recompute();
 }
 
 export function movePart(id: string, x: number, y: number): void {

@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { CATALOG, pinAbsPos } from "../circuit/catalog";
 import { pinKey, type Part, type PartType, type PinRef } from "../circuit/types";
-import { changePot, pressPart } from "../state/bridge";
+import { changePot, pressPart, togglePart } from "../state/bridge";
 import {
   addPart,
   cancelWiring,
@@ -347,6 +347,82 @@ export default function CircuitCanvas() {
             {pinNode(part, def.w, "VCC", "", "other")}
             {pinNode(part, def.w, "SIG", "", "other")}
             {pinNode(part, def.w, "GND", "", "other")}
+          </g>
+        );
+      }
+
+      case "switch": {
+        const visual = visuals.get(part.id);
+        const closed = visual?.kind === "switch" ? visual.closed : Number(part.attrs?.closed) === 1;
+        // 自锁开关：整块可点击切换开合（引脚 mousedown 会 stopPropagation，接线不受影响）
+        return (
+          <g
+            key={part.id}
+            {...common}
+            data-closed={closed ? "1" : "0"}
+            style={{ cursor: "pointer" }}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              selectPart(part.id);
+              void togglePart(part.id, !closed);
+            }}
+          >
+            <rect
+              width={def.w}
+              height={def.h}
+              rx={6}
+              fill="#2b3d52"
+              stroke={isSelected ? "#ffd54f" : "#5a7d9e"}
+            />
+            <line x1={14} y1={18} x2={50} y2={18} stroke="#8fb0cc" strokeWidth={2} />
+            <rect
+              x={closed ? 32 : 14}
+              y={10}
+              width={18}
+              height={16}
+              rx={3}
+              fill={closed ? "#7cb342" : "#3d5470"}
+              stroke="#8fb0cc"
+            />
+            <text x={def.w / 2} y={33} textAnchor="middle" fontSize={8} fill="#cfdce8">
+              {closed ? "ON" : "OFF"}
+            </text>
+            {pinNode(part, def.w, "1", "", "other")}
+            {pinNode(part, def.w, "2", "", "other")}
+          </g>
+        );
+      }
+
+      case "buzzer": {
+        const visual = visuals.get(part.id);
+        const on = visual?.kind === "buzzer" ? visual.on : false;
+        return (
+          <g
+            key={part.id}
+            {...common}
+            data-on={on ? "1" : "0"}
+            onMouseDown={(e) => {
+              selectOnDown(e);
+              const p = toCanvas(e.clientX, e.clientY);
+              setDrag({ id: part.id, dx: p.x - part.x, dy: p.y - part.y });
+            }}
+          >
+            <circle
+              cx={24}
+              cy={24}
+              r={16}
+              fill={on ? "#ffd740" : "#3d5470"}
+              stroke={isSelected ? "#ffd54f" : "#8fb0cc"}
+              strokeWidth={isSelected ? 2 : 1.2}
+            />
+            <text x={24} y={20} textAnchor="middle" fontSize={8} fill={on ? "#5a4300" : "#8fb0cc"}>
+              蜂鸣
+            </text>
+            {on ? <circle cx={24} cy={31} r={4} fill="#5a4300" /> : null}
+            <rect x={12} y={8} width={24} height={3} rx={1.5} fill="#8fb0cc" />
+            <rect x={12} y={37} width={24} height={3} rx={1.5} fill="#8fb0cc" />
+            {pinNode(part, def.w, "1", "", "other")}
+            {pinNode(part, def.w, "2", "", "other")}
           </g>
         );
       }

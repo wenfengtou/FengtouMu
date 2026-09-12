@@ -129,4 +129,61 @@ describe("diagram.json 读写", () => {
     const issues = validateDiagram(broken);
     expect(issues.some((i) => i.includes("终点元件不存在"))).toBe(true);
   });
+
+  it("拨动开关与蜂鸣器可以往返序列化", () => {
+    const d: Diagram = {
+      version: 1,
+      parts: [
+        { id: "esp", type: "board-devkitc", x: 40, y: 40 },
+        { id: "tgl1", type: "switch", x: 300, y: 80, attrs: { closed: 1 } },
+        { id: "bz1", type: "buzzer", x: 300, y: 160 },
+      ],
+      connections: [
+        { from: { part: "esp", pin: "GPIO2" }, to: { part: "tgl1", pin: "1" } },
+        { from: { part: "tgl1", pin: "2" }, to: { part: "bz1", pin: "1" } },
+      ],
+    };
+    const text = serializeDiagram(d);
+    const raw = JSON.parse(text) as {
+      parts: Array<Record<string, unknown>>;
+    };
+    const tgl = raw.parts.find((p) => p.id === "tgl1");
+    expect(tgl?.type).toBe("wokwi-slide-switch");
+    expect(tgl?.attrs).toEqual({ switch: { position: 1 } });
+    expect(raw.parts.find((p) => p.id === "bz1")?.type).toBe("wokwi-buzzer");
+
+    const { diagram, errors } = parseDiagram(text);
+    expect(errors).toEqual([]);
+    expect(diagram.parts.find((p) => p.id === "tgl1")?.attrs?.closed).toBe(1);
+    expect(diagram.connections).toHaveLength(2);
+  });
+
+  it("导入 Wokwi 拨动开关时读取嵌套 attrs.switch.position", () => {
+    const text = JSON.stringify({
+      version: 1,
+      parts: [{ type: "wokwi-slide-switch", id: "tgl1", left: 10, top: 10, attrs: { switch: { position: 1 } } }],
+      connections: [["tgl1:1", "esp:GPIO2", "green", []]],
+    });
+    const { diagram, errors } = parseDiagram(text);
+    expect(errors).toEqual([]);
+    const tgl = diagram.parts.find((p) => p.id === "tgl1");
+    expect(tgl?.type).toBe("switch");
+    expect(tgl?.attrs?.closed).toBe(1);
+    expect(diagram.connections[0].from.pin).toBe("1");
+  });
+
+  it("导入 Wokwi DIP 开关与蜂鸣器别名", () => {
+    const text = JSON.stringify({
+      version: 1,
+      parts: [
+        { type: "wokwi-dip-switch-4", id: "dip1", left: 0, top: 0 },
+        { type: "wokwi-buzzer", id: "bz1", left: 0, top: 0 },
+      ],
+      connections: [["dip1:1", "bz1:1", "green", []]],
+    });
+    const { diagram, errors } = parseDiagram(text);
+    expect(errors).toEqual([]);
+    expect(diagram.parts.find((p) => p.id === "dip1")?.type).toBe("switch");
+    expect(diagram.parts.find((p) => p.id === "bz1")?.type).toBe("buzzer");
+  });
 });

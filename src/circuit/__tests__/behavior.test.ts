@@ -6,6 +6,7 @@ import {
   buttonInjection,
   computeVisuals,
   potInjection,
+  switchInjection,
   type BehaviorInput,
 } from "../behavior";
 import { buildNetlist } from "../netlist";
@@ -99,6 +100,84 @@ describe("按键注入", () => {
       new Map(),
     );
     expect(buttonInjection(ctx, "sw1", true)).toBeNull();
+  });
+});
+
+describe("蜂鸣器外观", () => {
+  it("一端接高电平 GPIO、另一端接地时鸣响", () => {
+    const ctx = input(
+      [
+        { from: { part: "esp", pin: "GPIO2" }, to: { part: "bz1", pin: "1" } },
+        { from: { part: "bz1", pin: "2" }, to: { part: "esp", pin: "GND.1" } },
+      ],
+      [board, { id: "bz1", type: "buzzer", x: 0, y: 0 }],
+      new Map([[BOARD_PIN_GPIO2, pin({ value: 1 })]]),
+    );
+    const visual = computeVisuals(ctx).get("bz1");
+    expect(visual).toEqual({ kind: "buzzer", on: true });
+  });
+
+  it("GPIO 为低电平时不鸣响", () => {
+    const ctx = input(
+      [
+        { from: { part: "esp", pin: "GPIO2" }, to: { part: "bz1", pin: "1" } },
+        { from: { part: "bz1", pin: "2" }, to: { part: "esp", pin: "GND.1" } },
+      ],
+      [board, { id: "bz1", type: "buzzer", x: 0, y: 0 }],
+      new Map([[BOARD_PIN_GPIO2, pin({ value: 0 })]]),
+    );
+    const visual = computeVisuals(ctx).get("bz1");
+    expect(visual?.kind === "buzzer" && visual.on).toBe(false);
+  });
+});
+
+describe("拨动开关", () => {
+  it("外观反映 attrs.closed 开合状态", () => {
+    const ctx = input(
+      [],
+      [board, { id: "tgl1", type: "switch", x: 0, y: 0, attrs: { closed: 1 } }],
+      new Map(),
+    );
+    expect(computeVisuals(ctx).get("tgl1")).toEqual({ kind: "switch", closed: true });
+  });
+
+  const parts = [board, { id: "tgl1", type: "switch" as const, x: 0, y: 0 }];
+  const conns: Diagram["connections"] = [
+    { from: { part: "tgl1", pin: "1" }, to: { part: "esp", pin: "GPIO0" } },
+    { from: { part: "tgl1", pin: "2" }, to: { part: "esp", pin: "GND.1" } },
+  ];
+
+  it("开关接 GND 侧：闭合拉低、断开回高（上拉语义）", () => {
+    const ctx = input(conns, parts, new Map());
+    expect(switchInjection(ctx, "tgl1", true)).toEqual({
+      boardPin: BOARD_PIN_GPIO0,
+      gpio: 0,
+      value: 0,
+    });
+    expect(switchInjection(ctx, "tgl1", false)).toEqual({
+      boardPin: BOARD_PIN_GPIO0,
+      gpio: 0,
+      value: 1,
+    });
+  });
+
+  it("开关接 VCC 侧：闭合与断开都读高", () => {
+    const vccConns: Diagram["connections"] = [
+      { from: { part: "tgl1", pin: "1" }, to: { part: "esp", pin: "GPIO0" } },
+      { from: { part: "tgl1", pin: "2" }, to: { part: "esp", pin: "3V3" } },
+    ];
+    const ctx = input(vccConns, parts, new Map());
+    expect(switchInjection(ctx, "tgl1", true)?.value).toBe(1);
+    expect(switchInjection(ctx, "tgl1", false)?.value).toBe(1);
+  });
+
+  it("未连接到 GPIO 时不产生注入", () => {
+    const ctx = input(
+      [{ from: { part: "tgl1", pin: "2" }, to: { part: "esp", pin: "GND.1" } }],
+      parts,
+      new Map(),
+    );
+    expect(switchInjection(ctx, "tgl1", true)).toBeNull();
   });
 });
 

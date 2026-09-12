@@ -2,10 +2,17 @@
 
 import { CATALOG } from "../circuit/catalog";
 import type { PartType } from "../circuit/types";
-import { addPart, circuitStore } from "../state/circuitStore";
+import { addPart, circuitStore, nextSlot } from "../state/circuitStore";
 import { setMsg } from "../state/uiStore";
 
-const ORDER: PartType[] = ["led", "resistor", "pushbutton", "potentiometer"];
+const ORDER: PartType[] = [
+  "led",
+  "resistor",
+  "pushbutton",
+  "switch",
+  "buzzer",
+  "potentiometer",
+];
 
 export default function PartPalette() {
   return (
@@ -26,8 +33,8 @@ export default function PartPalette() {
               e.dataTransfer.effectAllowed = "copy";
             }}
             onClick={() => {
-              const count = circuitStore.get().diagram.parts.length;
-              const id = addPart(type, 420, 80 + (count - 1) * 50);
+              const slot = nextSlot(circuitStore.get().diagram);
+              const id = addPart(type, slot.x, slot.y);
               setMsg(`已添加 ${def.name}（${id}），可拖动调整位置`);
             }}
           >

@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 import { CATALOG, boardPinByBoardPin, boardPinByGpio, DEVKITC_PINMAP, partDef } from "../catalog";
 import type { PartType } from "../types";
 
-const TYPES: PartType[] = ["board-devkitc", "led", "resistor", "pushbutton", "potentiometer"];
+const TYPES: PartType[] = [
+  "board-devkitc",
+  "led",
+  "resistor",
+  "pushbutton",
+  "switch",
+  "buzzer",
+  "potentiometer",
+];
 
 describe("元件目录", () => {
   it("板级引脚与 PICSimLab 的 DevKitC 定义一致", () => {
@@ -37,5 +45,14 @@ describe("元件目录", () => {
     expect(partDef("resistor").passThrough).toBe(true);
     expect(partDef("board-devkitc").fixed).toBe(true);
     expect(partDef("led").passThrough).toBeUndefined();
+  });
+
+  it("拨动开关默认断开，蜂鸣器为两端元件", () => {
+    const sw = partDef("switch");
+    expect(sw.pins.map((p) => p.id)).toEqual(["1", "2"]);
+    expect(sw.attrs).toEqual({ closed: 0 });
+    const bz = partDef("buzzer");
+    expect(bz.pins.map((p) => p.id)).toEqual(["1", "2"]);
+    expect(bz.passThrough).toBeUndefined();
   });
 });

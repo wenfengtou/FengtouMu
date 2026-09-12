@@ -11,6 +11,8 @@ export type PartType =
   | "led"
   | "resistor"
   | "pushbutton"
+  | "switch"
+  | "buzzer"
   | "potentiometer";
 
 export interface Part {

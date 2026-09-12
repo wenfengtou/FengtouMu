@@ -136,6 +136,27 @@ export const CATALOG: Record<PartType, PartDef> = {
       { id: "B", label: "2", x: 56, y: 38, kind: "other" },
     ],
   },
+  switch: {
+    type: "switch",
+    name: "拨动开关",
+    w: 64,
+    h: 36,
+    attrs: { closed: 0 },
+    pins: [
+      { id: "1", label: "1", x: 10, y: 28, kind: "other" },
+      { id: "2", label: "2", x: 54, y: 28, kind: "other" },
+    ],
+  },
+  buzzer: {
+    type: "buzzer",
+    name: "蜂鸣器",
+    w: 48,
+    h: 48,
+    pins: [
+      { id: "1", label: "+", x: 24, y: 6, kind: "other" },
+      { id: "2", label: "-", x: 24, y: 42, kind: "other" },
+    ],
+  },
   potentiometer: {
     type: "potentiometer",
     name: "电位器",
