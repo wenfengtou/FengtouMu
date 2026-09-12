@@ -88,9 +88,14 @@ pub struct SimHost {
 
 impl SimHost {
     pub fn new(app: AppHandle) -> Self {
+        Self::with_bus(Arc::new(WryBus { app }))
+    }
+
+    /// 测试/自动化用：注入自定义事件总线（如 RecordingBus），可脱离 GUI 驱动宿主。
+    pub fn with_bus(bus: Arc<dyn EventBus>) -> Self {
         Self {
             shared: Arc::new(Shared::new()),
-            bus: Arc::new(WryBus { app }),
+            bus,
             child: Mutex::new(None),
             dll_path: Mutex::new(None),
             next_id: AtomicU64::new(1),
@@ -283,6 +288,16 @@ impl SimHost {
         }
     }
 
+    /// 启动健康判据（纯函数，便于协议级测试矩阵逐项覆盖）。
+    ///
+    /// 目的：避免把「QEMU 在 ROM 阶段抖几下后卡死」误判为启动成功。
+    /// 判定「固件确实在持续运行」：
+    ///   - 引脚活动累计 ≥4 次、首次活动距今 ≥3 秒、且最近一次活动在 2 秒内；或
+    ///   - UART 输出 ≥1500 字节（已进入应用日志阶段；ROM 卡死通常远小于此）。
+    pub fn health_pass(activity: u64, span_secs: f64, recent: bool, uart_bytes: u64) -> bool {
+        (activity >= 4 && span_secs >= 3.0 && recent) || uart_bytes >= 1500
+    }
+
     /// 启动仿真（自动重试：每次都是全新子进程）。
     pub fn start(&self, flash: &str, fw_dir: &str) -> Result<(), String> {
         self.stop();
@@ -312,10 +327,7 @@ impl SimHost {
             *self.child.lock().unwrap() = Some(cp);
             self.set_status(SimStatus::Loading);
 
-            // 健康判据（避免把 ROM 卡死误判为成功）：
-            //   - 引脚**持续**变化：累计 ≥4 次、首次活动距今 ≥3 秒、且最近一次活动在 2 秒内
-            //     （LED 闪烁等周期性驱动必然满足；QEMU 在 ROM 阶段抖几下后卡死则不满足），或
-            //   - 串口输出 ≥1500 字节（已进入应用日志阶段；ROM 卡死通常远小于此）
+            // 健康判据（避免把 ROM 卡死误判为成功），逐项覆盖见 health_pass 的文档与协议级测试
             let deadline = Instant::now() + Duration::from_secs(health_secs);
             let mut ok = false;
             let mut fatal: Option<String> = None;
@@ -328,15 +340,15 @@ impl SimHost {
                     .unwrap()
                     .map(|t| t.elapsed() < Duration::from_secs(2))
                     .unwrap_or(false);
-                let span_ok = self
+                let span_secs = self
                     .shared
                     .first_activity
                     .lock()
                     .unwrap()
-                    .map(|t| t.elapsed() >= Duration::from_secs(3))
-                    .unwrap_or(false);
+                    .map(|t| t.elapsed().as_secs_f64())
+                    .unwrap_or(0.0);
                 let uart = *self.shared.uart_bytes.lock().unwrap();
-                if (act >= 4 && span_ok && recent) || uart >= 1500 {
+                if SimHost::health_pass(act, span_secs, recent, uart) {
                     ok = true;
                     break;
                 }

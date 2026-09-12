@@ -508,6 +508,11 @@ fn run_qemu(dll: Arc<QemuDll>, fw_dir: String, flash: String, efuse: String, cor
         "driver=nvram.esp32.efuse,property=drive,value=efuse".into(),
         "-serial".into(),
         "none".into(),
+        // 我们不使用 VNC（界面是自绘 SVG，GPIO/UART 走回调）；关掉还能避免
+        // Windows 上 QEMU VNC 初始化 combase.dll 触发 fail-fast（0xc0000602）崩溃，
+        // 同时省掉 5900 端口与多余 CPU。
+        "-vnc".into(),
+        "none".into(),
     ];
 
     let cstrings: Vec<CString> = match args.iter().map(|a| CString::new(a.as_str())).collect() {

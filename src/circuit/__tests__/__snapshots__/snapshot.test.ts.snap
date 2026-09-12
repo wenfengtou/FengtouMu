@@ -1,0 +1,497 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`网表快照 > 标准教学电路的网表结构保持稳定 > 标准教学电路网表 1`] = `
+{
+  "netCount": 38,
+  "nets": [
+    {
+      "boardPins": [
+        1,
+      ],
+      "gpios": [],
+      "hasGnd": false,
+      "hasVcc": true,
+      "nodes": [
+        "esp:3V3",
+      ],
+    },
+    {
+      "boardPins": [
+        2,
+      ],
+      "gpios": [],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:EN",
+      ],
+    },
+    {
+      "boardPins": [
+        3,
+      ],
+      "gpios": [
+        36,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO36",
+      ],
+    },
+    {
+      "boardPins": [
+        4,
+      ],
+      "gpios": [
+        39,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO39",
+      ],
+    },
+    {
+      "boardPins": [
+        5,
+      ],
+      "gpios": [
+        34,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO34",
+      ],
+    },
+    {
+      "boardPins": [
+        6,
+      ],
+      "gpios": [
+        35,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO35",
+      ],
+    },
+    {
+      "boardPins": [
+        7,
+      ],
+      "gpios": [
+        32,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO32",
+      ],
+    },
+    {
+      "boardPins": [
+        8,
+      ],
+      "gpios": [
+        33,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO33",
+      ],
+    },
+    {
+      "boardPins": [
+        9,
+      ],
+      "gpios": [
+        25,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO25",
+      ],
+    },
+    {
+      "boardPins": [
+        10,
+      ],
+      "gpios": [
+        26,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO26",
+      ],
+    },
+    {
+      "boardPins": [
+        11,
+      ],
+      "gpios": [
+        27,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO27",
+      ],
+    },
+    {
+      "boardPins": [
+        12,
+      ],
+      "gpios": [
+        14,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO14",
+      ],
+    },
+    {
+      "boardPins": [
+        13,
+      ],
+      "gpios": [
+        12,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO12",
+      ],
+    },
+    {
+      "boardPins": [
+        14,
+      ],
+      "gpios": [],
+      "hasGnd": true,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GND.1",
+        "led1:C",
+      ],
+    },
+    {
+      "boardPins": [
+        15,
+      ],
+      "gpios": [
+        13,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO13",
+      ],
+    },
+    {
+      "boardPins": [
+        16,
+      ],
+      "gpios": [
+        9,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO9",
+      ],
+    },
+    {
+      "boardPins": [
+        17,
+      ],
+      "gpios": [
+        10,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO10",
+      ],
+    },
+    {
+      "boardPins": [
+        18,
+      ],
+      "gpios": [
+        11,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO11",
+      ],
+    },
+    {
+      "boardPins": [
+        19,
+      ],
+      "gpios": [],
+      "hasGnd": false,
+      "hasVcc": true,
+      "nodes": [
+        "esp:VIN",
+      ],
+    },
+    {
+      "boardPins": [
+        20,
+      ],
+      "gpios": [
+        6,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO6",
+      ],
+    },
+    {
+      "boardPins": [
+        21,
+      ],
+      "gpios": [
+        7,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO7",
+      ],
+    },
+    {
+      "boardPins": [
+        22,
+      ],
+      "gpios": [
+        8,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO8",
+      ],
+    },
+    {
+      "boardPins": [
+        23,
+      ],
+      "gpios": [
+        15,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO15",
+      ],
+    },
+    {
+      "boardPins": [
+        24,
+      ],
+      "gpios": [
+        2,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO2",
+        "led1:A",
+        "r1:a",
+        "r1:b",
+      ],
+    },
+    {
+      "boardPins": [
+        25,
+      ],
+      "gpios": [
+        0,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO0",
+        "sw1:A",
+      ],
+    },
+    {
+      "boardPins": [
+        26,
+      ],
+      "gpios": [
+        4,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO4",
+      ],
+    },
+    {
+      "boardPins": [
+        27,
+      ],
+      "gpios": [
+        16,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO16",
+      ],
+    },
+    {
+      "boardPins": [
+        28,
+      ],
+      "gpios": [
+        17,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO17",
+      ],
+    },
+    {
+      "boardPins": [
+        29,
+      ],
+      "gpios": [
+        5,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO5",
+      ],
+    },
+    {
+      "boardPins": [
+        30,
+      ],
+      "gpios": [
+        18,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO18",
+      ],
+    },
+    {
+      "boardPins": [
+        31,
+      ],
+      "gpios": [
+        19,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO19",
+      ],
+    },
+    {
+      "boardPins": [
+        32,
+      ],
+      "gpios": [],
+      "hasGnd": true,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GND.2",
+        "sw1:B",
+      ],
+    },
+    {
+      "boardPins": [
+        33,
+      ],
+      "gpios": [
+        21,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO21",
+      ],
+    },
+    {
+      "boardPins": [
+        34,
+      ],
+      "gpios": [
+        3,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO3",
+      ],
+    },
+    {
+      "boardPins": [
+        35,
+      ],
+      "gpios": [
+        1,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO1",
+      ],
+    },
+    {
+      "boardPins": [
+        36,
+      ],
+      "gpios": [
+        22,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO22",
+      ],
+    },
+    {
+      "boardPins": [
+        37,
+      ],
+      "gpios": [
+        23,
+      ],
+      "hasGnd": false,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GPIO23",
+      ],
+    },
+    {
+      "boardPins": [
+        38,
+      ],
+      "gpios": [],
+      "hasGnd": true,
+      "hasVcc": false,
+      "nodes": [
+        "esp:GND.3",
+      ],
+    },
+  ],
+}
+`;

@@ -30,7 +30,7 @@ npm run build:release
 
 # 验证
 npm run test:unit        # 前端单元测试（网表/行为/图纸/工程文件）
-npm run test:rust        # Rust 测试（自动跳过需本机 QEMU DLL 的用例，CI 同款）
+npm run test:rust        # Rust 测试（自动跳过需本机 QEMU DLL 的用例，CI 同款；协议级矩阵 33 项）
 npm run test:rust:local  # Rust 全量测试（含 DLL 用例，需先准备好 lib/qemu 与固件）
 npm run test:ui          # UI 自动化（真实点击；8 条链路：板卡 LED / 电路图 LED / 按键 / 电位器 / 工程新建 / 环境自检 / 自动保存恢复 / 一键编译）
 ```
@@ -70,6 +70,7 @@ FengtouMu/
 - [开发计划](docs/开发计划.md)
 - [开发日志](docs/开发日志.md)
 - [对比分析：circuit-muse 可借鉴之处](docs/对比分析-circuit-muse.md)
+- [仿真协议与协议级测试矩阵](docs/仿真协议.md)
 - [libqemu-xtensa.dll 编译指南（Windows + MSYS2）](docs/build-qemu-dll-windows.md)
 
 ## 已知限制
@@ -79,8 +80,9 @@ FengtouMu/
 - 目前仅支持 ESP32（esp32-picsimlab 机型）+ DevKitC 板卡。
 - 电路图中的 LED 与电阻已实测可由固件驱动；按键按下时界面与注入链路正常，但固件以 `INPUT_PULLUP` 读取时低电平无法稳定保持（QEMU 模型侧限制），运行期"按键改变固件行为"待继续定位；电位器经 `cmd_set_apin` 注入 ADC 读数的链路已实测可用（现有 demo 固件未使用 ADC，故仅验证注入无报错）。
 - 工程文件保存的是内容与路径配置；电路图里元件的绝对位置会一并存下，但元件之间暂无自动布局（新增元件按固定步进叠加）。
-- 串口输出按波特率模拟、明显滞后：固件 setup 里的 `Serial.println` 可能要等 20–40 秒才出现在终端，属 QEMU 模型行为；仿真运行约 20 秒后固件可能偶发崩溃重启（模型侧问题，待定位）。
-- CI 只跑不需要 QEMU 的用例：`sim_integration`、`button_injection`、`user_sketch_blink`、`buildchain::compiles_demo_sketch_locally` 需要本机 `lib/qemu`、固件镜像或 arduino-cli，已标记 `#[ignore]`，请用 `npm run test:rust:local` 在本地执行。
+- 串口输出按波特率模拟、明显滞后：固件 setup 里的 `Serial.println` 可能要等 20–40 秒才出现在终端，属 QEMU 模型行为。
+- 该 QEMU 模型对宿主负载敏感（模型侧、待定位）：独立运行时固件可正常闪烁，但应用内高负载下偶发"冷启动停摆"或"进入应用后非法指令崩溃（Guru Meditation）"；仿真已禁用 VNC（`-vnc none`），消除了 Windows 上 VNC 初始化导致的 combase fail-fast 崩溃。
+- CI 只跑不需要 QEMU 的用例：`sim_integration`、`button_injection`、`user_sketch_blink`、`behavior_matrix`、`buildchain::compiles_demo_sketch_locally` 需要本机 `lib/qemu`、固件镜像或 arduino-cli，已标记 `#[ignore]`，请用 `npm run test:rust:local` 在本地执行。
 
 ## 第三方组件与许可
 

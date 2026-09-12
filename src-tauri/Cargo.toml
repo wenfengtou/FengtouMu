@@ -24,6 +24,11 @@ path = "src/main.rs"
 name = "esp32-sim"
 path = "src/bin/sim_worker.rs"
 
+# 协议级测试用的"假 worker"（不加载 DLL，仅配合 tests/worker_protocol.rs，不打包发布）
+[[bin]]
+name = "fm-fake-worker"
+path = "src/bin/fake_worker.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
