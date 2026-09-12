@@ -5,7 +5,7 @@ import { DEFAULT_FLASH, DEFAULT_FW, DEFAULT_OUT, DEFAULT_SKETCH_DIR } from "../c
 import { compileSketch } from "../lib/api";
 import { DEFAULT_SKETCH } from "../project/defaults";
 import { createStore } from "./store";
-import { setBusy, setMsg } from "./uiStore";
+import { appendCompileLog, setBusy, setMsg } from "./uiStore";
 
 export interface EditorState {
   code: string;
@@ -46,6 +46,7 @@ export async function compileCurrent(fqbn?: string): Promise<void> {
   const { sketchDir, code } = editorStore.get();
   setBusy(true);
   setMsg("正在编译…（首次约 1-3 分钟）");
+  appendCompileLog({ type: "info", message: `Compiling sketch in ${sketchDir || "(default)"} …` });
   try {
     // 把编辑器里的代码一并交给编译链：编译前会写入草图目录的主 .ino，
     // 避免"改了代码但编出来还是旧固件"。
@@ -54,14 +55,16 @@ export async function compileCurrent(fqbn?: string): Promise<void> {
       editorStore.set({ flashPath: r.merged_bin });
       const syncNote = r.synced ? "（编辑器内容已同步到草图目录" : "";
       const backupNote = r.backup ? `，原文件备份为 ${r.backup}` : "";
-      setMsg(
-        `编译成功：${r.merged_bin}${syncNote}${backupNote}${r.synced ? "）" : ""}`,
-      );
+      const message = `编译成功：${r.merged_bin}${syncNote}${backupNote}${r.synced ? "）" : ""}`;
+      setMsg(message);
+      appendCompileLog({ type: "success", message });
     } else {
       setMsg(`编译未产出镜像：${r.message}`);
+      appendCompileLog({ type: "error", message: `Compilation produced no image: ${r.message}` });
     }
   } catch (e) {
     setMsg(`编译失败: ${e}`);
+    appendCompileLog({ type: "error", message: `Compile failed: ${e}` });
   } finally {
     setBusy(false);
   }

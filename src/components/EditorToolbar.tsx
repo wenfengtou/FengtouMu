@@ -1,0 +1,181 @@
+/** 统一工具条（CircuitMuse 风格）：编译/运行/停止/复位 + 文件标签 + 溢出菜单 + 输出控制台 */
+
+import { useEffect, useRef, useState } from "react";
+import { STATUS_TEXT } from "../config";
+import { compileCurrent, editorStore, pickFlashFile, pickFwDir, pickSketchDir } from "../state/editorStore";
+import { setEnvPanelOpen } from "../state/envStore";
+import {
+  exportWokwiProject,
+  importWokwiProject,
+  openProject,
+  projectStore,
+  restoreSession,
+  saveProjectAs,
+} from "../state/projectStore";
+import { simStore, startSim, stopSim } from "../state/simStore";
+import { useStore } from "../state/store";
+import { setConsoleOpen, setMsg, uiStore } from "../state/uiStore";
+import FileTabs from "./FileTabs";
+
+export default function EditorToolbar() {
+  const busy = useStore(uiStore, (s) => s.busy);
+  const consoleOpen = useStore(uiStore, (s) => s.consoleOpen);
+  const status = useStore(simStore, (s) => s.status);
+  const dllPath = useStore(simStore, (s) => s.dllPath);
+  const flashPath = useStore(editorStore, (s) => s.flashPath);
+  const fqbn = useStore(projectStore, (s) => s.fqbn);
+  const session = useStore(projectStore, (s) => s.session);
+
+  const running = status === "running" || status === "loading" || status === "stopping";
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onClickOutside = (e: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false);
+    };
+    window.addEventListener("mousedown", onClickOutside);
+    return () => window.removeEventListener("mousedown", onClickOutside);
+  }, [moreOpen]);
+
+  const resetSim = () => {
+    void stopSim().then(() => {
+      setTimeout(() => void startSim(), 600);
+    });
+  };
+
+  const flashName = flashPath.split(/[\\/]/).pop() || "";
+
+  const menu = (label: string, action: () => void, extra?: Record<string, string>) => (
+    <button
+      key={label}
+      className="tb-overflow-item"
+      onClick={() => {
+        action();
+        setMoreOpen(false);
+      }}
+      {...extra}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+      </svg>
+      <span className="tb-overflow-label">{label}</span>
+    </button>
+  );
+
+  return (
+    <div className="editor-toolbar-wrapper">
+      <div className="editor-toolbar">
+        <div className="toolbar-group">
+          <span className="tb-board-pill" title="Active board: ESP32 DevKitC V1">
+            <span className="tb-board-pill-icon">⬡</span>
+            <span className="tb-board-pill-label">ESP32 DevKitC V1</span>
+            {running && <span className="tb-board-pill-running" />}
+          </span>
+          <div className="tb-divider" />
+          <button
+            className="tb-btn tb-btn-compile"
+            data-action="compile"
+            title="Compile Code"
+            disabled={busy}
+            onClick={() => void compileCurrent(fqbn)}
+          >
+            {busy ? (
+              <svg className="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 20V4" />
+                <path d="M8 16l4-4-4-4" />
+                <path d="M14 16l4-4-4-4" />
+              </svg>
+            )}
+          </button>
+          {!running ? (
+            <button
+              className="tb-btn tb-btn-run btn-run"
+              title="Run Simulation"
+              disabled={busy || !dllPath}
+              onClick={() => void startSim()}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M5 3l14 9-14 9z" />
+              </svg>
+            </button>
+          ) : (
+            <>
+              <button className="tb-btn tb-btn-stop btn-stop" title="Stop" onClick={() => void stopSim()}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="5" y="5" width="14" height="14" rx="1" />
+                </svg>
+              </button>
+              <button className="tb-btn tb-btn-reset" title="Reset" onClick={resetSim}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 4v6h6" />
+                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                </svg>
+              </button>
+            </>
+          )}
+          <span className={`status status-${status}`}>● {STATUS_TEXT[status]}</span>
+        </div>
+
+        <div className="toolbar-center-slot">
+          <FileTabs />
+        </div>
+
+        <div className="toolbar-group toolbar-group-right">
+          {flashName && (
+            <span className="path" title={flashPath}>
+              {flashName}
+            </span>
+          )}
+          <div className="tb-divider" />
+          <div className="tb-overflow-wrap" ref={moreRef}>
+            <button
+              className={`tb-btn tb-btn-overflow${moreOpen ? " tb-btn-overflow-active" : ""}`}
+              title="More"
+              onClick={() => setMoreOpen((v) => !v)}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="12" cy="12" r="1.6" />
+                <circle cx="19" cy="12" r="1.6" />
+                <circle cx="5" cy="12" r="1.6" />
+              </svg>
+            </button>
+            {moreOpen && (
+              <div className="tb-overflow-menu">
+                {session
+                  ? menu("Restore last session", () => void restoreSession(), { "data-action": "restore-session" })
+                  : null}
+                {menu("Open project…", () => void openProject())}
+                {menu("Save project as…", () => void saveProjectAs())}
+                {menu("Import Wokwi (.zip)", () => void importWokwiProject())}
+                {menu("Export Wokwi (.zip)", () => void exportWokwiProject())}
+                {menu("Select sketch folder", () => void pickSketchDir())}
+                {menu("Select fw folder", () => void pickFwDir())}
+                {menu("Load firmware image", () => void pickFlashFile())}
+                {menu("Environment check", () => setEnvPanelOpen(true), { "data-action": "env-check" })}
+                {menu("Docs", () => setMsg("文档位于项目 docs/ 目录（开发日志、设计文档、QEMU DLL 编译指南）"))}
+                {menu("GitHub", () => setMsg("https://github.com/wenfengtou/FengtouMu"))}
+              </div>
+            )}
+          </div>
+          <button
+            className={`tb-btn tb-btn-output${consoleOpen ? " tb-btn-output-active" : ""}`}
+            title="Toggle Output Console"
+            onClick={() => setConsoleOpen(!consoleOpen)}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="4 17 10 11 4 5" />
+              <line x1="12" y1="19" x2="20" y2="19" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

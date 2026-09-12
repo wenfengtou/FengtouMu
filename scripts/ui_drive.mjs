@@ -98,9 +98,10 @@ async function send(method, params = {}) {
   return new Promise((resolve, reject) => {
     pending.set(id, (m) => (m.error ? reject(new Error(m.error.message)) : resolve(m.result)));
     ws.send(JSON.stringify({ id, method, params }));
+    // 放宽到 45s：长编译期间 WebView2 后台节流会让 eval 挂起，编译结束即恢复
     setTimeout(() => {
       if (pending.delete(id)) reject(new Error("timeout:" + method));
-    }, 15000);
+    }, 45000);
   });
 }
 
@@ -204,13 +205,24 @@ async function clickAt(x, y) {
 }
 
 const clickSel = async (selector, dyRatio = 0.5) => {
+  // 若目标在可滚动容器（元件面板）内，先滚动到可见，避免命中裁剪区外的坐标
+  await evalJs(`(() => {
+    const el = document.querySelector(${JSON.stringify(selector)});
+    if (el && el.closest && el.closest('.palette-items, .tb-overflow-menu, .file-explorer-list')) {
+      el.scrollIntoView?.({ block: 'nearest' });
+    }
+    return true;
+  })()`);
+  await sleep(120);
   const c = await centerOf(selector, dyRatio);
   await clickAt(c.x, c.y);
 };
 
 async function openTab(name) {
+  // 新界面（CircuitMuse 风格）：画布头部有 Board / Circuit 分段切换
+  const view = name.includes("板卡") ? "board" : "circuit";
   await evalJs(`(() => {
-    const btn = Array.from(document.querySelectorAll('.pane-tabs .tab')).find(b => b.textContent.trim() === ${JSON.stringify(name)});
+    const btn = document.querySelector('[data-view=${JSON.stringify(view)}]');
     if (btn) btn.click();
     return !!btn;
   })()`);
@@ -520,6 +532,14 @@ async function stageProjectBar() {
 
 /** F. 环境自检：面板应列出全部检查项，且本机环境无缺失 */
 async function stageEnvCheck() {
+  // 打开汉堡菜单，让 [data-action="env-check"] 进入 DOM（默认折叠在菜单里）
+  const opened = await evalJs(`(() => {
+    const btn = Array.from(document.querySelectorAll('.unified-toolbar button')).find(b => (b.getAttribute('title')||'') === 'Menu');
+    if (btn) { btn.click(); return true; }
+    return false;
+  })()`);
+  if (!opened) return { ok: false, why: "未找到汉堡菜单按钮" };
+  await sleep(300);
   await clickSel('[data-action="env-check"]');
   let report = null;
   const deadline = Date.now() + 60000;
@@ -577,12 +597,12 @@ async function stageRestoreSession() {
 async function stageCompile() {
   await ensureStopped();
   const clicked = await evalJs(`(() => {
-    const btn = Array.from(document.querySelectorAll('.toolbar button')).find(b => b.textContent.trim() === '编译');
+    const btn = document.querySelector('[data-action="compile"]');
     if (!btn) return false;
     btn.click();
     return true;
   })()`);
-  if (!clicked) return { ok: false, why: "未找到「编译」按钮" };
+  if (!clicked) return { ok: false, why: "未找到「编译」按钮（[data-action=compile]）" };
   log("H 编译: 已点击[编译]，等待 arduino-cli…");
 
   const deadline = Date.now() + 240000;

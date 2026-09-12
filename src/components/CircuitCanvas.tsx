@@ -38,6 +38,7 @@ export default function CircuitCanvas() {
   const selectedWire = useStore(circuitStore, (s) => s.selectedWire);
   const wiringFrom = useStore(circuitStore, (s) => s.wiringFrom);
   const pins = useStore(simStore, (s) => s.pins);
+  const zoomCmd = useStore(circuitStore, (s) => s.zoomCmd);
 
   const svgRef = useRef<SVGSVGElement>(null);
   const [view, setView] = useState({ scale: 1, tx: 16, ty: 16 });
@@ -120,6 +121,20 @@ export default function CircuitCanvas() {
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
+
+  // 画布头部 +/−/复位按钮发来的缩放指令
+  useEffect(() => {
+    if (!zoomCmd) return;
+    setView((v) => {
+      const scale =
+        zoomCmd.op === "in"
+          ? v.scale * 1.25
+          : zoomCmd.op === "out"
+            ? v.scale / 1.25
+            : 1;
+      return { ...v, scale: Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale)) };
+    });
+  }, [zoomCmd]);
 
   const gpioPinFill = (boardPin?: number, kind?: string): string => {
     if (boardPin === undefined) return "#3a5a7a";

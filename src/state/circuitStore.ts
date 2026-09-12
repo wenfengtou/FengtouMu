@@ -28,6 +28,8 @@ export interface CircuitState {
   pressed: string | null;
   /** 电位器元件 id → 0..1 位置 */
   potValues: Record<string, number>;
+  /** 画布缩放指令（画布头部 +/−/复位按钮发来的命令） */
+  zoomCmd: { op: "in" | "out" | "reset"; seq: number } | null;
 }
 
 const initialDiagram = emptyDiagram();
@@ -41,7 +43,13 @@ export const circuitStore = createStore<CircuitState>({
   wiringFrom: null,
   pressed: null,
   potValues: {},
+  zoomCmd: null,
 });
+
+/** 请求画布缩放（seq 递增以触发每次指令） */
+export function setZoomCmd(op: "in" | "out" | "reset", seq: number): void {
+  circuitStore.set({ zoomCmd: { op, seq } });
+}
 
 /** 组装行为计算的输入 */
 export function behaviorInput(state: CircuitState = circuitStore.get()): BehaviorInput {

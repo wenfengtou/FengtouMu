@@ -1,0 +1,175 @@
+.component-palette {
+  background-color: #2d2d2d;
+  border-right: 1px solid #444;
+  display: flex;
+  flex-direction: column;
+  width: 200px;
+  height: 100%;
+}
+
+.palette-header {
+  padding: 15px;
+  border-bottom: 1px solid #444;
+}
+
+.palette-header h3 {
+  margin: 0 0 5px 0;
+  font-size: 16px;
+  color: #fff;
+}
+
+.palette-hint {
+  font-size: 12px;
+  color: #888;
+}
+
+.palette-items {
+  flex: 1;
+  padding: 10px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.palette-item {
+  background-color: #3d3d3d;
+  padding: 12px;
+  border-radius: 6px;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.2s;
+  border: 2px solid transparent;
+}
+
+.palette-item:hover {
+  background-color: #4d4d4d;
+  border-color: #007acc;
+}
+
+.palette-item:active {
+  cursor: grabbing;
+  transform: scale(0.95);
+}
+
+.palette-icon {
+  font-size: 24px;
+  width: 30px;
+  text-align: center;
+}
+
+.palette-label {
+  font-size: 14px;
+  color: #fff;
+  font-weight: 500;
+}
+
+.palette-help {
+  padding: 15px;
+  border-top: 1px solid #444;
+  background-color: #252525;
+}
+
+.palette-help p {
+  margin: 5px 0;
+  font-size: 11px;
+  color: #888;
+  line-height: 1.4;
+}
+
+/* Scrollbar styling */
+.palette-items::-webkit-scrollbar {
+  width: 6px;
+}
+
+.palette-items::-webkit-scrollbar-track {
+  background: #2d2d2d;
+}
+
+.palette-items::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 3px;
+}
+
+.palette-items::-webkit-scrollbar-thumb:hover {
+  background: #666;
+}
+
+/* ── FengtouMu 复刻：元件面板紧凑化（覆盖，保证 6 条目 + 操作区全部可见可点） ── */
+.palette-help {
+  padding: 10px 12px;
+}
+.palette-help p {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+.palette-actions {
+  border-top: 1px solid #444;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.palette-actions button {
+  width: 100%;
+  text-align: left;
+  padding: 4px 8px;
+  background: #383838;
+  border: 1px solid #4a4a4a;
+  border-radius: 4px;
+  color: #ccc;
+  font-size: 10.5px;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.palette-actions button:hover:not(:disabled) {
+  background: #4a4a4a;
+  color: #fff;
+}
+.palette-actions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.palette-items {
+  gap: 6px;
+  padding: 8px;
+}
+.palette-item {
+  padding: 8px 10px;
+}
+.palette-icon {
+  font-size: 20px;
+  width: 26px;
+}
+.palette-label {
+  font-size: 12.5px;
+}
+
+/* 更紧凑：保证 800px 窗口高下 6 个条目全部可见 */
+.palette-header {
+  padding: 10px 12px;
+}
+.palette-header h3 {
+  margin: 0 0 3px 0;
+  font-size: 14px;
+}
+.palette-hint {
+  font-size: 11px;
+}
+.palette-item {
+  padding: 6px 10px;
+  gap: 8px;
+}
+.palette-actions {
+  padding: 6px;
+  gap: 3px;
+}
+.palette-actions button {
+  padding: 3px 8px;
+  font-size: 10px;
+}
