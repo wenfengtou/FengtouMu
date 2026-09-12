@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouse
 import { CATALOG, pinAbsPos } from "../circuit/catalog";
 import { pinKey, type Part, type PartType, type PinRef } from "../circuit/types";
 import { changePot, pressPart, togglePart } from "../state/bridge";
+import WokwiPart from "./WokwiPart";
 import {
   addPart,
   cancelWiring,
@@ -27,13 +28,6 @@ import { useStore } from "../state/store";
 const SNAP = 10;
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 2.2;
-
-const LED_COLORS: Record<string, { on: string; off: string }> = {
-  red: { on: "#ff5252", off: "#4a2a2a" },
-  green: { on: "#69f0ae", off: "#274a35" },
-  blue: { on: "#40c4ff", off: "#1f3a4a" },
-  yellow: { on: "#ffd740", off: "#4a4326" },
-};
 
 const snap = (v: number): number => Math.round(v / SNAP) * SNAP;
 
@@ -213,7 +207,6 @@ export default function CircuitCanvas() {
         const visual = visuals.get(part.id);
         const color = String(part.attrs?.color ?? "red");
         const lit = visual?.kind === "led" ? visual.lit : false;
-        const palette = LED_COLORS[color] ?? LED_COLORS.red;
         return (
           <g
             key={part.id}
@@ -225,24 +218,16 @@ export default function CircuitCanvas() {
               setDrag({ id: part.id, dx: p.x - part.x, dy: p.y - part.y });
             }}
           >
-            <line x1={20} y1={6} x2={20} y2={22} stroke="#c0c0c0" strokeWidth={2} />
-            <line x1={20} y1={46} x2={20} y2={62} stroke="#c0c0c0" strokeWidth={2} />
-            {lit ? <circle cx={20} cy={34} r={19} fill={palette.on} opacity={0.25} /> : null}
-            <circle
-              cx={20}
-              cy={34}
-              r={13}
-              fill={lit ? palette.on : palette.off}
-              stroke={isSelected ? "#ffd54f" : "#666"}
-              strokeWidth={isSelected ? 2 : 1.2}
-            />
+            <WokwiPart type="led" state={{ kind: "led", lit, color }} />
             {pinNode(part, def.w, "A", "", "other")}
             {pinNode(part, def.w, "C", "", "other")}
           </g>
         );
       }
 
-      case "resistor":
+      case "resistor": {
+        const visual = visuals.get(part.id);
+        const value = visual?.kind === "resistor" ? visual.value : String(part.attrs?.value ?? "");
         return (
           <g
             key={part.id}
@@ -253,28 +238,12 @@ export default function CircuitCanvas() {
               setDrag({ id: part.id, dx: p.x - part.x, dy: p.y - part.y });
             }}
           >
-            <line x1={6} y1={10} x2={16} y2={10} stroke="#c0c0c0" strokeWidth={2} />
-            <line x1={60} y1={10} x2={70} y2={10} stroke="#c0c0c0" strokeWidth={2} />
-            <rect
-              x={16}
-              y={3}
-              width={44}
-              height={14}
-              rx={3}
-              fill="#d7c9a5"
-              stroke={isSelected ? "#ffd54f" : "#8a7a55"}
-            />
-            <rect x={26} y={3} width={4} height={14} fill="#6d4c41" />
-            <rect x={34} y={3} width={4} height={14} fill="#000" />
-            <rect x={42} y={3} width={4} height={14} fill="#c62828" />
-            <rect x={50} y={3} width={4} height={14} fill="#c9a227" />
-            <text x={38} y={-2} fontSize={8} textAnchor="middle" fill="#cfdce8">
-              {String(part.attrs?.value ?? "")}Ω
-            </text>
+            <WokwiPart type="resistor" state={{ kind: "resistor", value }} />
             {pinNode(part, def.w, "a", "", "other")}
             {pinNode(part, def.w, "b", "", "other")}
           </g>
         );
+      }
 
       case "pushbutton": {
         const visual = visuals.get(part.id);
@@ -295,17 +264,7 @@ export default function CircuitCanvas() {
             onMouseUp={() => void pressPart(part.id, false)}
             onMouseLeave={() => void pressPart(part.id, false)}
           >
-            <rect
-              width={def.w}
-              height={def.h}
-              rx={6}
-              fill="#2b3d52"
-              stroke={isSelected ? "#ffd54f" : "#5a7d9e"}
-            />
-            <rect x={18} y={pressed ? 10 : 6} width={32} height={22} rx={4} fill={pressed ? "#7cb342" : "#3d5470"} />
-            <text x={def.w / 2} y={44} textAnchor="middle" fontSize={8} fill="#cfdce8">
-              {pressed ? "按下" : "按键"}
-            </text>
+            <WokwiPart type="pushbutton" state={{ kind: "pushbutton", pressed }} />
             {pinNode(part, def.w, "A", "", "other")}
             {pinNode(part, def.w, "B", "", "other")}
           </g>
@@ -315,33 +274,23 @@ export default function CircuitCanvas() {
       case "potentiometer": {
         const visual = visuals.get(part.id);
         const value = visual?.kind === "potentiometer" ? visual.value : 0.5;
-        const angle = -135 + value * 270;
         return (
-          <g key={part.id} {...common} data-pot={value.toFixed(3)}>
-            <rect
-              width={def.w}
-              height={def.h}
-              rx={8}
-              fill="#2b3d52"
-              stroke={isSelected ? "#ffd54f" : "#5a7d9e"}
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                selectPart(part.id);
-                const p = toCanvas(e.clientX, e.clientY);
-                void changePot(part.id, (p.y - part.y - 12) / (def.h - 24));
-                setPotDrag(part.id);
-              }}
-            />
-            <circle cx={30} cy={42} r={16} fill="#3d5470" stroke="#8fb0cc" />
-            <line
-              x1={30}
-              y1={42}
-              x2={30 + 13 * Math.sin((angle * Math.PI) / 180)}
-              y2={42 - 13 * Math.cos((angle * Math.PI) / 180)}
-              stroke="#ffd54f"
-              strokeWidth={2}
-            />
-            <text x={30} y={70} textAnchor="middle" fontSize={8} fill="#cfdce8">
+          <g
+            key={part.id}
+            {...common}
+            data-pot={value.toFixed(3)}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              selectPart(part.id);
+              const p = toCanvas(e.clientX, e.clientY);
+              void changePot(part.id, (p.y - part.y - 12) / (def.h - 24));
+              setPotDrag(part.id);
+            }}
+          >
+            <WokwiPart type="potentiometer" state={{ kind: "potentiometer", value }} />
+            {/* 透明的拖动热区：覆盖 wokwi 原图，点击旋钮任意位置即可拖动 */}
+            <rect x={0} y={0} width={def.w} height={def.h} fill="transparent" />
+            <text x={def.w / 2} y={def.h - 4} textAnchor="middle" fontSize={8} fill="#cfdce8">
               {Math.round(value * 100)}%
             </text>
             {pinNode(part, def.w, "VCC", "", "other")}
@@ -367,26 +316,7 @@ export default function CircuitCanvas() {
               void togglePart(part.id, !closed);
             }}
           >
-            <rect
-              width={def.w}
-              height={def.h}
-              rx={6}
-              fill="#2b3d52"
-              stroke={isSelected ? "#ffd54f" : "#5a7d9e"}
-            />
-            <line x1={14} y1={18} x2={50} y2={18} stroke="#8fb0cc" strokeWidth={2} />
-            <rect
-              x={closed ? 32 : 14}
-              y={10}
-              width={18}
-              height={16}
-              rx={3}
-              fill={closed ? "#7cb342" : "#3d5470"}
-              stroke="#8fb0cc"
-            />
-            <text x={def.w / 2} y={33} textAnchor="middle" fontSize={8} fill="#cfdce8">
-              {closed ? "ON" : "OFF"}
-            </text>
+            <WokwiPart type="switch" state={{ kind: "switch", closed }} />
             {pinNode(part, def.w, "1", "", "other")}
             {pinNode(part, def.w, "2", "", "other")}
           </g>
@@ -407,20 +337,7 @@ export default function CircuitCanvas() {
               setDrag({ id: part.id, dx: p.x - part.x, dy: p.y - part.y });
             }}
           >
-            <circle
-              cx={24}
-              cy={24}
-              r={16}
-              fill={on ? "#ffd740" : "#3d5470"}
-              stroke={isSelected ? "#ffd54f" : "#8fb0cc"}
-              strokeWidth={isSelected ? 2 : 1.2}
-            />
-            <text x={24} y={20} textAnchor="middle" fontSize={8} fill={on ? "#5a4300" : "#8fb0cc"}>
-              蜂鸣
-            </text>
-            {on ? <circle cx={24} cy={31} r={4} fill="#5a4300" /> : null}
-            <rect x={12} y={8} width={24} height={3} rx={1.5} fill="#8fb0cc" />
-            <rect x={12} y={37} width={24} height={3} rx={1.5} fill="#8fb0cc" />
+            <WokwiPart type="buzzer" state={{ kind: "buzzer", on }} />
             {pinNode(part, def.w, "1", "", "other")}
             {pinNode(part, def.w, "2", "", "other")}
           </g>

@@ -106,67 +106,73 @@ export const CATALOG: Record<PartType, PartDef> = {
   led: {
     type: "led",
     name: "LED",
+    // 尺寸与引脚坐标对齐 wokwi-led 原图（自然尺寸 40×50，引脚 A/C 在底部）
     w: 40,
-    h: 68,
+    h: 50,
     attrs: { color: "red" },
     pins: [
-      { id: "A", label: "正极", x: 20, y: 6, kind: "other" },
-      { id: "C", label: "负极", x: 20, y: 62, kind: "other" },
+      { id: "A", label: "正极", x: 25, y: 42, kind: "other" },
+      { id: "C", label: "负极", x: 15, y: 42, kind: "other" },
     ],
   },
   resistor: {
     type: "resistor",
     name: "电阻",
-    w: 76,
-    h: 20,
+    // 对齐 wokwi-resistor（59×11，引脚在水平中线）
+    w: 59,
+    h: 11,
     attrs: { value: "220" },
     passThrough: true,
     pins: [
-      { id: "a", label: "a", x: 6, y: 10, kind: "other" },
-      { id: "b", label: "b", x: 70, y: 10, kind: "other" },
+      { id: "a", label: "a", x: 0, y: 6, kind: "other" },
+      { id: "b", label: "b", x: 59, y: 6, kind: "other" },
     ],
   },
   pushbutton: {
     type: "pushbutton",
     name: "按键",
-    w: 68,
-    h: 48,
+    // 对齐 wokwi-pushbutton（67×45）；A/B 取上排 1.l/1.r（按下导通）
+    w: 67,
+    h: 45,
     pins: [
-      { id: "A", label: "1", x: 12, y: 38, kind: "other" },
-      { id: "B", label: "2", x: 56, y: 38, kind: "other" },
+      { id: "A", label: "1", x: 0, y: 13, kind: "other" },
+      { id: "B", label: "2", x: 67, y: 13, kind: "other" },
     ],
   },
   switch: {
     type: "switch",
     name: "拨动开关",
-    w: 64,
-    h: 36,
+    // 对齐 wokwi-slide-switch（32×35）；用 1/2 两个脚（第三个脚 3 仅作原图展示）
+    w: 32,
+    h: 35,
     attrs: { closed: 0 },
     pins: [
-      { id: "1", label: "1", x: 10, y: 28, kind: "other" },
-      { id: "2", label: "2", x: 54, y: 28, kind: "other" },
+      { id: "1", label: "1", x: 6.5, y: 34, kind: "other" },
+      { id: "2", label: "2", x: 16, y: 34, kind: "other" },
     ],
   },
   buzzer: {
     type: "buzzer",
     name: "蜂鸣器",
-    w: 48,
-    h: 48,
+    // 对齐 wokwi-buzzer（64×76，引脚在底部引线末端）
+    w: 64,
+    h: 76,
     pins: [
-      { id: "1", label: "+", x: 24, y: 6, kind: "other" },
-      { id: "2", label: "-", x: 24, y: 42, kind: "other" },
+      { id: "1", label: "+", x: 27, y: 74, kind: "other" },
+      { id: "2", label: "-", x: 37, y: 74, kind: "other" },
     ],
   },
   potentiometer: {
     type: "potentiometer",
     name: "电位器",
-    w: 60,
-    h: 84,
+    // 对齐 wokwi-potentiometer（76×76，三脚在底部：GND/SIG/VCC）
+    w: 76,
+    h: 76,
     attrs: { value: 50 },
     pins: [
-      { id: "VCC", label: "VCC", x: 30, y: 6, kind: "other" },
-      { id: "SIG", label: "SIG", x: 54, y: 42, kind: "other" },
-      { id: "GND", label: "GND", x: 30, y: 78, kind: "other" },
+      { id: "VCC", label: "VCC", x: 49, y: 68.5, kind: "other" },
+      { id: "SIG", label: "SIG", x: 39, y: 68.5, kind: "other" },
+      { id: "GND", label: "GND", x: 29, y: 68.5, kind: "other" },
     ],
   },
 };

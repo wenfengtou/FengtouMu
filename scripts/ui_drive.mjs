@@ -270,6 +270,15 @@ async function zoomOut(times) {
 
 const ledLit = () => evalJs(`document.querySelector('[data-part="led1"]')?.getAttribute('data-lit') === '1'`);
 
+/** 断言某个元件内部已渲染出 wokwi 原图（.wokwi-art svg），证明外观不是手绘占位 */
+async function assertWokwiArt(partId) {
+  const ok = await evalJs(
+    `!!document.querySelector('[data-part=${JSON.stringify(partId)}] .wokwi-art svg')`,
+  );
+  if (!ok) throw new Error(`元件 ${partId} 未渲染出 wokwi 原图（.wokwi-art svg 缺失）`);
+  log(`元件 ${partId} 的 wokwi 原图已渲染`);
+}
+
 async function runOnce(label) {
   log(`--- ${label}: 点击[运行] ---`);
   await clickSel(".btn-run");
@@ -360,6 +369,7 @@ async function stageCircuitLed() {
   const wires1 = (await ui()).wires;
   log(`B 电路图: 导线 ${wires0} → ${wires1} 条`);
   if (wires1 !== wires0 + 2) return { ok: false, why: `连线失败（导线数 ${wires1}）` };
+  await assertWokwiArt("led1");
 
   const r = await runOnce("B 电路图");
   if (!r.ok) return r;
@@ -401,6 +411,7 @@ async function stageCircuitButton() {
   const p0 = await ui();
   log(`C 按键: 当前导线 ${p0.wires} 条`);
   if (p0.wires !== 4) return { ok: false, why: `按键连线失败（导线数 ${p0.wires}）` };
+  await assertWokwiArt("sw1");
 
   const r = await runOnce("C 按键");
   if (!r.ok) return r;
@@ -448,6 +459,7 @@ async function stageCircuitPot() {
   const p0 = await ui();
   log(`D 电位器: 导线 ${wires0} → ${p0.wires} 条`);
   if (p0.wires !== wires0 + 3) return { ok: false, why: `电位器连线失败（导线数 ${p0.wires}，期望 ${wires0 + 3}）` };
+  await assertWokwiArt("pot1");
 
   const r = await runOnce("D 电位器");
   if (!r.ok) return r;
@@ -611,6 +623,7 @@ async function stageCircuitSwitch() {
   const p0 = await ui();
   log(`I 开关: 导线 ${wires0} → ${p0.wires} 条`);
   if (p0.wires !== wires0 + 2) return { ok: false, why: `开关连线失败（导线数 ${p0.wires}）` };
+  await assertWokwiArt("tgl1");
 
   const r = await runOnce("I 开关");
   if (!r.ok) return r;
