@@ -50,6 +50,8 @@ impl EventBus for RecordingBus {
 const EFUSE_SIZE: usize = 124;
 const FLASH_SIZE: u64 = 4 * 1024 * 1024; // 4MB，与 PICSimLab DBGGetROMSize 一致
 const UART_FLUSH_MS: u128 = 10;
+/// 两个消费游标都越过该字节数后，把已消费前缀从缓冲区移除（限制内存增长）
+const UART_TRIM_AFTER: usize = 4096;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -65,7 +67,10 @@ pub struct SimCore {
     pub bus: Arc<dyn EventBus>,
     pub pins: Mutex<PinTable>,
     pub uart: Mutex<Vec<u8>>,
-    pub uart_flushed: Mutex<usize>,
+    /// 事件总线（uart-data）已发送的字节数
+    pub uart_bus_flushed: Mutex<usize>,
+    /// poll_uart 已取走的字节数（测试 / cmd_uart_poll 兜底）
+    pub uart_polled: Mutex<usize>,
     pub last_uart_flush: Mutex<std::time::Instant>,
     pub status: Mutex<SimStatus>,
 }
@@ -81,7 +86,8 @@ impl SimCore {
             bus,
             pins: Mutex::new(PinTable::default()),
             uart: Mutex::new(Vec::new()),
-            uart_flushed: Mutex::new(0),
+            uart_bus_flushed: Mutex::new(0),
+            uart_polled: Mutex::new(0),
             last_uart_flush: Mutex::new(std::time::Instant::now()),
             status: Mutex::new(SimStatus::Idle),
         })
@@ -95,17 +101,33 @@ impl SimCore {
         *self.last_uart_flush.lock().unwrap() = std::time::Instant::now();
         let (new_bytes, flushed) = {
             let u = self.uart.lock().unwrap();
-            let mut f = self.uart_flushed.lock().unwrap();
-            if u.len() > *f {
-                let chunk = u[*f..].to_vec();
-                *f = u.len();
-                (chunk, *f)
+            let mut bf = self.uart_bus_flushed.lock().unwrap();
+            if u.len() > *bf {
+                let chunk = u[*bf..].to_vec();
+                *bf = u.len();
+                (chunk, *bf)
             } else {
-                (Vec::new(), *f)
+                (Vec::new(), *bf)
             }
         };
         if !new_bytes.is_empty() {
             self.bus.emit("uart-data", serde_json::to_value(UartChunk { flushed, data: new_bytes }).unwrap_or(serde_json::Value::Null));
+        }
+        self.trim_uart();
+    }
+
+    /// 两个消费游标都已越过前缀时丢弃旧字节，避免缓冲区无限增长。
+    /// 注意：bus 与 poll 各自维护游标，互不抢占 —— 修复了旧实现里
+    /// "flush 先推进共享游标、poll_uart 拿到残缺块"的首字节丢失问题。
+    fn trim_uart(&self) {
+        let mut u = self.uart.lock().unwrap();
+        let f = *self.uart_polled.lock().unwrap();
+        let bf = *self.uart_bus_flushed.lock().unwrap();
+        let keep_from = f.min(bf);
+        if keep_from >= UART_TRIM_AFTER {
+            u.drain(..keep_from);
+            *self.uart_polled.lock().unwrap() -= keep_from;
+            *self.uart_bus_flushed.lock().unwrap() -= keep_from;
         }
     }
 }
@@ -278,7 +300,8 @@ impl SimEngine {
         // 复位仿真状态（重启场景：清除上次运行的引脚/串口残留）
         core.pins.lock().unwrap().reset();
         core.uart.lock().unwrap().clear();
-        *core.uart_flushed.lock().unwrap() = 0;
+        *core.uart_bus_flushed.lock().unwrap() = 0;
+        *core.uart_polled.lock().unwrap() = 0;
 
         {
             let mut st = core.status.lock().unwrap();
@@ -456,22 +479,25 @@ impl SimEngine {
         core.pins.lock().unwrap().snapshot()
     }
 
-    /// 增量读取串口输出（前端轮询兜底，与事件并行不冲突）。
+    /// 增量读取串口输出（前端轮询兜底，与总线事件并行不冲突）。
+    /// 与 `flush_uart_if_due` 各自维护消费游标，任何一路都不会丢字节。
     pub fn poll_uart(&self) -> Vec<u8> {
         let core = SIM_CORE.get().expect("SimCore must be initialized");
         core.flush_uart_if_due();
-        let (buf, flushed) = {
+        let buf = {
             let u = core.uart.lock().unwrap();
-            let mut f = core.uart_flushed.lock().unwrap();
-            if u.len() > *f {
-                let b = u[*f..].to_vec();
-                *f = u.len();
-                (b, *f)
+            let mut p = core.uart_polled.lock().unwrap();
+            let bf = core.uart_bus_flushed.lock().unwrap();
+            // 只取"总线已发出"的部分，保证与事件流不重不漏
+            if *bf > *p {
+                let b = u[*p..*bf].to_vec();
+                *p = *bf;
+                b
             } else {
-                (Vec::new(), *f)
+                Vec::new()
             }
         };
-        let _ = flushed;
+        core.trim_uart();
         buf
     }
 
