@@ -52,7 +52,9 @@ FengtouMu/
 ## 文档
 
 - [设计方案 v1.0](docs/ESP32_离线仿真IDE_设计方案.md)
+- [开发计划](docs/开发计划.md)
 - [开发日志](docs/开发日志.md)
+- [对比分析：circuit-muse 可借鉴之处](docs/对比分析-circuit-muse.md)
 - [libqemu-xtensa.dll 编译指南（Windows + MSYS2）](docs/build-qemu-dll-windows.md)
 
 ## 已知限制
