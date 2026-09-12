@@ -1,0 +1,33 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ---- 本项目：排除构建产物与第三方二进制（可重新生成） ----
+# QEMU 动态库及依赖（约 85MB，可由 wenfengtou/qemu 编译产出）
+lib/qemu/
+# 固件编译输出（由 arduino-cli 编译生成）
+build_demo/
+build_demo_*/
+# 打包用的仿真子进程二进制（npm run build:release 会重新生成）
+src-tauri/resources/esp32-sim.exe
