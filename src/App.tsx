@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState, type MouseEvent as ReactMouseEvent } from "react";
 import BoardView from "./components/BoardView";
 import CircuitPanel from "./components/CircuitPanel";
 import CodeEditor from "./components/CodeEditor";
@@ -44,6 +44,7 @@ function App() {
   const busy = useStore(uiStore, (s) => s.busy);
   const view = useStore(uiStore, (s) => s.view);
   const fqbn = useStore(projectStore, (s) => s.fqbn);
+  const [splitting, setSplitting] = useState(false);
 
   useEffect(() => {
     initCircuitBridge();
@@ -54,10 +55,38 @@ function App() {
 
   const running = status === "running" || status === "loading" || status === "stopping";
 
+  // 编辑器 / 画布分栏拖拽（VS Code 风格的分隔条）
+  const onSplitterDown = (e: ReactMouseEvent) => {
+    e.preventDefault();
+    setSplitting(true);
+    const move = (ev: globalThis.MouseEvent) => {
+      const pct = Math.min(75, Math.max(22, (ev.clientX / window.innerWidth) * 100));
+      document.documentElement.style.setProperty("--split", `${pct}%`);
+    };
+    const up = () => {
+      setSplitting(false);
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
+
   return (
     <div className="app">
-      <header className="toolbar">
-        <span className="logo">FengtouMu</span>
+      <header className="app-header">
+        <div className="header-content">
+          <div className="header-left">
+            <div className="header-brand">
+              <span className="logo">FengtouMu</span>
+              <span className="header-sub">ESP32 离线仿真 IDE</span>
+            </div>
+            <ProjectBar />
+          </div>
+        </div>
+      </header>
+
+      <div className="toolbar">
         <button onClick={() => void pickDllFile()} disabled={busy}>
           加载 DLL
         </button>
@@ -92,9 +121,7 @@ function App() {
           </>
         )}
         <span className={`status status-${status}`}>● {STATUS_TEXT[status]}</span>
-      </header>
-
-      <ProjectBar />
+      </div>
 
       <div className="msgbar" title={msg}>
         {msg || "就绪：加载 DLL → 编译或选择固件 → 运行仿真"}
@@ -102,11 +129,12 @@ function App() {
 
       <main className="main">
         <section className="editor-pane">
-          <div className="pane-title">代码编辑器（Arduino）</div>
+          <div className="pane-title">代码编辑器 · sketch.ino</div>
           <div className="editor-body">
             <CodeEditor code={code} onChange={setCode} />
           </div>
         </section>
+        <div className={`splitter${splitting ? " active" : ""}`} onMouseDown={onSplitterDown} title="拖拽调整分栏" />
         <section className="board-pane">
           <div className="pane-title pane-tabs">
             <button
