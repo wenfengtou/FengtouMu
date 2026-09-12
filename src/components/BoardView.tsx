@@ -92,7 +92,14 @@ export default function BoardView({ pins, onBootPress }: Props) {
         <text x={BOARD_W / 2} y={270} textAnchor="middle" fontSize="8" fill="#5a85ad">
           DevKitC V4
         </text>
-        <text x={BOARD_W / 2} y={286} textAnchor="middle" fontSize="8" fill="#5a85ad">
+        <text
+          x={BOARD_W / 2}
+          y={286}
+          textAnchor="middle"
+          fontSize="8"
+          fill="#5a85ad"
+          data-board-led={ledOn ? "1" : "0"}
+        >
           {ledOn ? "运行中…" : "待机"}
         </text>
 

@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "build:release": "powershell -ExecutionPolicy Bypass -File scripts/build_release.ps1",
+    "test:unit": "vitest run",
     "test:ui": "node scripts/ui_drive.mjs"
   },
   "dependencies": {
@@ -26,6 +27,7 @@
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^6.0.2",
     "typescript": "~6.0.3",
-    "vite": "^8.0.16"
+    "vite": "^8.0.16",
+    "vitest": "^5.0.0"
   }
 }

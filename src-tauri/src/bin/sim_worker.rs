@@ -140,6 +140,14 @@ fn main() {
                     Err(e) => reply(false, None, Some(e.to_string())),
                 }
             }
+            "set_apin" => {
+                let chn = v.get("chn").and_then(|x| x.as_i64()).unwrap_or(0) as i32;
+                let value = v.get("value").and_then(|x| x.as_i64()).unwrap_or(0) as i32;
+                match engine.set_apin(chn, value) {
+                    Ok(()) => reply(true, None, None),
+                    Err(e) => reply(false, None, Some(e.to_string())),
+                }
+            }
             "pins" => {
                 let st = engine.pin_states();
                 reply(true, serde_json::to_value(st).ok(), None);

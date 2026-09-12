@@ -1,74 +1,50 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+/** 串口终端：内容由外部传入（受控），便于状态集中管理 */
 
-export interface TerminalHandle {
-  append(text: string): void;
-  clear(): void;
-}
+import { useEffect, useRef, useState } from "react";
 
 interface Props {
+  text: string;
   onInput?: (text: string) => void;
+  onClear?: () => void;
 }
 
-const SerialTerminal = forwardRef<TerminalHandle, Props>(function SerialTerminal(
-  { onInput },
-  ref,
-) {
-  const [lines, setLines] = useState<string[]>([
-    "ESP32 离线仿真 IDE — 串口终端（UART0）",
-    "----------------------------------------",
-  ]);
+export default function SerialTerminal({ text, onInput, onClear }: Props) {
   const [input, setInput] = useState("");
   const boxRef = useRef<HTMLDivElement>(null);
+  const lines = text.length > 0 ? text.split("\n") : [];
 
-  useImperativeHandle(ref, () => ({
-    append(text: string) {
-      setLines((prev) => {
-        const next = prev.length ? prev.slice() : [""];
-        const last = next[next.length - 1] ?? "";
-        const parts = text.split("\n");
-        next[next.length - 1] = last + parts[0];
-        for (let i = 1; i < parts.length; i++) next.push(parts[i]);
-        if (next.length > 500) next.splice(0, next.length - 500);
-        return next;
-      });
-    },
-    clear() {
-      setLines([]);
-    },
-  }));
+  useEffect(() => {
+    if (boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight;
+  }, [text]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key.toLowerCase() === "l") {
         e.preventDefault();
-        setLines([]);
+        onClear?.();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  useEffect(() => {
-    if (boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight;
-  }, [lines]);
+  }, [onClear]);
 
   const send = () => {
     if (!input) return;
-    const text = input + "\n";
-    setLines((p) => [...p, `> ${input}`]);
+    onInput?.(input + "\n");
     setInput("");
-    onInput?.(text);
   };
 
   return (
     <div className="terminal">
       <div className="terminal-title">
         串口终端 UART0
-        <button className="terminal-clear" onClick={() => setLines([])} title="清空（Ctrl+L）">
+        <button className="terminal-clear" onClick={() => onClear?.()} title="清空（Ctrl+L）">
           清空
         </button>
       </div>
       <div className="terminal-body" ref={boxRef}>
+        <div className="terminal-line">ESP32 离线仿真 IDE — 串口终端（UART0）</div>
+        <div className="terminal-line">----------------------------------------</div>
         {lines.map((l, i) => (
           <div key={i} className="terminal-line">
             {l}
@@ -91,6 +67,4 @@ const SerialTerminal = forwardRef<TerminalHandle, Props>(function SerialTerminal
       </div>
     </div>
   );
-});
-
-export default SerialTerminal;
+}

@@ -1,3 +1,4 @@
+pub mod fsio;
 pub mod sim;
 
 use sim::worker_host::AppState;
@@ -20,12 +21,15 @@ pub fn run() {
             sim::worker_host::cmd_sim_resume,
             sim::worker_host::cmd_pin_write,
             sim::worker_host::cmd_uart_send,
+            sim::worker_host::cmd_set_apin,
             sim::worker_host::cmd_pin_states,
             sim::worker_host::cmd_uart_poll,
             sim::worker_host::cmd_sim_status,
             sim::worker_host::cmd_dll_loaded,
             sim::worker_host::cmd_auto_load_dll,
             sim::buildchain::cmd_compile,
+            fsio::cmd_read_text_file,
+            fsio::cmd_write_text_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

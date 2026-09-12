@@ -38,12 +38,19 @@ export const uartPoll = () => invoke<number[]>("cmd_uart_poll");
 export const simStatus = () => invoke<SimStatus>("cmd_sim_status");
 export const dllLoaded = () => invoke<boolean>("cmd_dll_loaded");
 export const autoLoadDll = () => invoke<string>("cmd_auto_load_dll");
+/** 注入模拟引脚电压（电位器等），chn 为 ESP32 SAR ADC 通道号，value 为 12 位读数 */
+export const setApin = (chn: number, value: number) =>
+  invoke<void>("cmd_set_apin", { chn, value });
 export const compileSketch = (sketchDir: string, outputDir: string, fqbn?: string) =>
   invoke<{ ok: boolean; merged_bin: string | null; message: string }>("cmd_compile", {
     sketchDir,
     outputDir,
     fqbn,
   });
+/** 读写文本文件（电路图等工程文件） */
+export const readTextFile = (path: string) => invoke<string>("cmd_read_text_file", { path });
+export const writeTextFile = (path: string, contents: string) =>
+  invoke<void>("cmd_write_text_file", { path, contents });
 
 // ---- 事件 ----
 export const onGpioUpdate = (cb: (s: PinState) => void): Promise<UnlistenFn> =>

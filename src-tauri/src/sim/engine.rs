@@ -2,7 +2,7 @@
 //! 启动流程复用 PICSimLab bsim_qemu.cc 中已验证的参数构造与线程模型。
 
 use crate::sim::pins::{PinState, PinTable, DEVKITC_PINMAP};
-use crate::sim::qemu_dll::{Callbacks, QemuDll, SimError};
+use crate::sim::qemu_dll::{Callbacks, QemuDll, SetPinFn, SimError};
 use serde::{Deserialize, Serialize};
 use std::ffi::{CString, c_void};
 use std::os::raw::{c_char, c_int};
@@ -13,6 +13,11 @@ use tauri::{AppHandle, Emitter};
 
 /// 回调线程（QEMU 内部线程）访问的共享核心。
 static SIM_CORE: OnceLock<Arc<SimCore>> = OnceLock::new();
+
+/// QEMU 的 set_pin 函数指针。QEMU 每次读取 GPIO 输入寄存器都会请求一次同步
+/// （picsimlab_dir_pin(-1, ...)），此时必须把外部驱动的电平重新推回模型，
+/// 否则界面上的按键/传感器电平会被模型内部状态覆盖。
+static SET_PIN_FN: OnceLock<SetPinFn> = OnceLock::new();
 
 /// 事件总线抽象：将引擎与 GUI 框架（Tauri）解耦，便于无 GUI 自动化测试。
 pub trait EventBus: Send + Sync {
@@ -124,6 +129,17 @@ extern "C" fn cb_write_pin(pin: c_int, value: c_int) {
 
 extern "C" fn cb_dir_pin(pin: c_int, dir: c_int) {
     let Some(core) = SIM_CORE.get() else { return };
+    if pin < 0 {
+        // QEMU 每次读取 GPIO 输入寄存器都会请求同步（dir = -1，或 in_sel/out_sel 变更）。
+        // 这里把外部驱动的引脚值重新推回模型，与 PICSimLab 的行为一致。
+        let forced = core.pins.lock().unwrap().forced_inputs();
+        if let Some(set_pin) = SET_PIN_FN.get() {
+            for (p, v) in forced {
+                unsafe { set_pin(p as c_int, v) };
+            }
+        }
+        return;
+    }
     // QEMU 侧 dir 语义：0=输出 1=输入（与 PICSimLab 内部 !dir 相反）
     let mut t = core.pins.lock().unwrap();
     t.on_dir(pin, dir == 0);
@@ -393,6 +409,18 @@ impl SimEngine {
         Ok(())
     }
 
+    /// 注入模拟引脚电压（ADC）。`chn` 为 ESP32 SAR ADC 通道号，`value` 为 12 位读数。
+    pub fn set_apin(&self, chn: i32, value: i32) -> Result<(), SimError> {
+        let dll = self.require_dll()?;
+        // 与 set_pin 同理：跨线程写入需要在 BQL 保护下进行
+        unsafe {
+            (dll.bql_lock)(b"esp32-ide\0".as_ptr() as *const c_char, line!() as c_int);
+            (dll.set_apin)(chn as c_int, value as c_int);
+            (dll.bql_unlock)();
+        }
+        Ok(())
+    }
+
     /// 前端设置输入引脚（按键等）。
     pub fn write_pin(&self, pin: usize, value: i32) -> Result<PinState, SimError> {
         if !(1..=38).contains(&pin) {
@@ -400,8 +428,11 @@ impl SimEngine {
         }
         let dll = self.require_dll()?;
         let core = SIM_CORE.get().expect("SimCore must be initialized");
+        // 引脚下拉由 QEMU 线程执行，跨线程调用必须持 BQL，否则电平变化不会被 vCPU 观察到
         unsafe {
+            (dll.bql_lock)(b"esp32-ide\0".as_ptr() as *const c_char, line!() as c_int);
             (dll.set_pin)(pin as c_int, value);
+            (dll.bql_unlock)();
         }
         let st = {
             let mut t = core.pins.lock().unwrap();
@@ -486,6 +517,8 @@ fn run_qemu(dll: Arc<QemuDll>, fw_dir: String, flash: String, efuse: String, cor
     let mut argv: Vec<*mut c_char> = cstrings.iter().map(|cs| cs.as_ptr() as *mut c_char).collect();
 
     unsafe {
+        // 供输入同步回调使用：把外部引脚电平重新推回模型
+        let _ = SET_PIN_FN.set(dll.set_pin);
         (dll.register_callbacks)(&callbacks as *const Callbacks as *mut c_void);
         (dll.qemu_init)(argv.len() as c_int, argv.as_mut_ptr(), std::ptr::null());
     }

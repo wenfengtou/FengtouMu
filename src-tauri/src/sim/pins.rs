@@ -33,6 +33,10 @@ pub struct PinState {
 pub struct PinTable {
     values: [i32; PIN_COUNT + 1],
     dirs: [i32; PIN_COUNT + 1],
+    /// 该引脚是否由外部（界面上的按键、传感器等）主动驱动。
+    /// QEMU 每次读取输入寄存器时会请求同步，此时需要把这些值重新推给它，
+    /// 否则外部电平会被模型内部状态覆盖（与 PICSimLab 的行为一致）。
+    driven: [bool; PIN_COUNT + 1],
 }
 
 impl Default for PinTable {
@@ -40,6 +44,7 @@ impl Default for PinTable {
         Self {
             values: [0; PIN_COUNT + 1],
             dirs: [DIR_IN; PIN_COUNT + 1],
+            driven: [false; PIN_COUNT + 1],
         }
     }
 }
@@ -53,6 +58,17 @@ impl PinTable {
         for d in self.dirs.iter_mut() {
             *d = DIR_IN;
         }
+        for f in self.driven.iter_mut() {
+            *f = false;
+        }
+    }
+
+    /// 需要向外重新推送的外部驱动输入：(板级引脚号, 电平)。
+    pub fn forced_inputs(&self) -> Vec<(usize, i32)> {
+        (1..=PIN_COUNT)
+            .filter(|p| self.driven[*p])
+            .map(|p| (p, self.values[p]))
+            .collect()
     }
 
     /// 记录 QEMU 输出回调（板级 pin，1-based）。返回 (pin, gpio, value, dir, 是否发生变化)。
@@ -64,6 +80,8 @@ impl PinTable {
         let changed = self.values[p] != value || self.dirs[p] != DIR_OUT;
         self.values[p] = value;
         self.dirs[p] = DIR_OUT;
+        // 固件接管该引脚后，不再按外部输入推送
+        self.driven[p] = false;
         changed.then(|| self.state_of(p))
     }
 
@@ -81,6 +99,7 @@ impl PinTable {
         }
         self.values[pin] = value;
         self.dirs[pin] = DIR_IN;
+        self.driven[pin] = true;
         Some(self.state_of(pin))
     }
 
