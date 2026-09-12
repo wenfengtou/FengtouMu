@@ -32,7 +32,7 @@ npm run build:release
 npm run test:unit        # 前端单元测试（网表/行为/图纸/工程文件）
 npm run test:rust        # Rust 测试（自动跳过需本机 QEMU DLL 的用例，CI 同款）
 npm run test:rust:local  # Rust 全量测试（含 DLL 用例，需先准备好 lib/qemu 与固件）
-npm run test:ui          # UI 自动化（真实点击；7 条链路：板卡 LED / 电路图 LED / 按键 / 电位器 / 工程新建 / 环境自检 / 自动保存恢复）
+npm run test:ui          # UI 自动化（真实点击；8 条链路：板卡 LED / 电路图 LED / 按键 / 电位器 / 工程新建 / 环境自检 / 自动保存恢复 / 一键编译）
 ```
 
 > `lib/qemu/`（`libqemu-xtensa.dll` 与 glib 等依赖、ROM/fw）体积大且可再生成，**未纳入版本库**。

@@ -9,6 +9,7 @@
 //   E 自动保存恢复：预置 autosave.fmp → 点「恢复上次编辑」→ 内容与工程名被整份灌回
 //   F 工程工具条：点「新建」→ 电路图与导线清空、标题回到未命名工程
 //   G 环境自检：点「环境自检」→ 面板列出全部检查项且本机无缺失
+//   H 一键编译：点「编译」→ arduino-cli 产出合并镜像、固件路径切到 *.ino.merged.bin
 //
 // 顺序说明：恢复链路必须排在「新建」之前 —— 新建会清掉会话标记（保存 / 打开也会），
 // 排在后面就再也看不到「恢复上次编辑」按钮了。
@@ -560,6 +561,40 @@ async function stageRestoreSession() {
   return { ok: true };
 }
 
+/** H. 一键编译：点「编译」应产出合并镜像并把固件路径指过去 */
+async function stageCompile() {
+  await ensureStopped();
+  const clicked = await evalJs(`(() => {
+    const btn = Array.from(document.querySelectorAll('.toolbar button')).find(b => b.textContent.trim() === '编译');
+    if (!btn) return false;
+    btn.click();
+    return true;
+  })()`);
+  if (!clicked) return { ok: false, why: "未找到「编译」按钮" };
+  log("H 编译: 已点击[编译]，等待 arduino-cli…");
+
+  const deadline = Date.now() + 240000;
+  let last = "";
+  let sawCompiling = false;
+  while (Date.now() < deadline) {
+    await sleep(1000);
+    const p = await ui();
+    last = p.msg;
+    if (last.includes("正在编译")) sawCompiling = true;
+    if (sawCompiling && last.includes("编译成功")) {
+      log(`H 编译: 成功 → flash=${p.flash}`);
+      if (!p.flash.endsWith(".ino.merged.bin")) {
+        return { ok: false, why: `固件路径未指向合并镜像：${p.flash}` };
+      }
+      return { ok: true };
+    }
+    if (last.includes("编译失败") || last.includes("编译未产出")) {
+      return { ok: false, why: last.slice(0, 400) };
+    }
+  }
+  return { ok: false, why: `编译超时，最后提示：${last.slice(0, 200)}` };
+}
+
 // ===== 主流程 =====
 seedAutosave();
 killApp();
@@ -606,6 +641,7 @@ const stages = [
   ["E 自动保存恢复", stageRestoreSession],
   ["F 工程工具条", stageProjectBar],
   ["G 环境自检", stageEnvCheck],
+  ["H 一键编译", stageCompile],
 ];
 
 const failed = [];
@@ -627,5 +663,5 @@ if (failed.length > 0) {
   failed.forEach((f) => log("  - " + f));
   process.exit(2);
 }
-log("UI 自动化验证通过：板卡 LED、电路图 LED、按键注入、电位器注入、工程新建、环境自检、自动保存恢复 七条链路全部成功");
+log("UI 自动化验证通过：板卡 LED、电路图 LED、按键注入、电位器注入、工程新建、环境自检、自动保存恢复、一键编译 八条链路全部成功");
 process.exit(0);
