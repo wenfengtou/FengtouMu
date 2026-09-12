@@ -6,17 +6,27 @@
 //   B 电路图：放置 LED → 连线 GPIO2/GND → 运行 → 画布上的 LED 闪烁 → 停止
 //   C 电路图 + 按键：放置按键 → 连线 GPIO0/GND → 运行 → 按住 → 界面按键状态更新 → 停止
 //   D 电路图 + 电位器：放置电位器 → SIG 接 GPIO34 → 运行 → 拖动旋钮 → 读数改变且注入无报错 → 停止
+//   E 自动保存恢复：预置 autosave.fmp → 点「恢复上次编辑」→ 内容与工程名被整份灌回
+//   F 工程工具条：点「新建」→ 电路图与导线清空、标题回到未命名工程
+//   G 环境自检：点「环境自检」→ 面板列出全部检查项且本机无缺失
+//
+// 顺序说明：恢复链路必须排在「新建」之前 —— 新建会清掉会话标记（保存 / 打开也会），
+// 排在后面就再也看不到「恢复上次编辑」按钮了。
 //
 // 注：固件侧“按住”电平保持受 QEMU GPIO 输入模型限制（见 docs/开发日志.md），
 //     因此 C 只断言界面状态与注入链路，不断言 LED 常亮。
 // 冷启动偶发卡死由应用内部自动重试，这里只需等待。
 
 import { spawn, execSync } from "node:child_process";
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const EXE = path.join(__dirname, "..", "src-tauri", "target", "release", "esp32-ide.exe");
+// Tauri 的应用数据目录：%APPDATA%\<identifier>
+const CONFIG_DIR = path.join(process.env.APPDATA ?? "", "com.lwf.esp32-ide");
+const AUTOSAVE = path.join(CONFIG_DIR, "autosave.fmp");
 const CDP = "http://127.0.0.1:9222";
 const START_TIMEOUT_MS = 150000;
 const LED_SAMPLE_MS = 25000;
@@ -39,6 +49,42 @@ function workerRunning() {
     return out.includes("esp32-sim.exe");
   } catch {
     return false;
+  }
+}
+
+/**
+ * 预置一份自动保存内容（阶段 G 用），让「恢复上次编辑」链路的断言不依赖上一次运行是否恰好触发过自动保存。
+ * 结构与 Rust 侧 Project 一致（diagram 是 diagram.json 文本）。
+ */
+function seedAutosave() {
+  const diagram = JSON.stringify({
+    version: 1,
+    parts: [
+      { type: "board-esp32-devkitc", id: "esp", top: 40, left: 40, attrs: {} },
+      { type: "wokwi-led", id: "led1", top: 240, left: 460, attrs: { color: "red" } },
+    ],
+    connections: [
+      ["led1:A", "esp:GPIO2", "green", []],
+      ["led1:C", "esp:GND.1", "green", []],
+    ],
+  });
+  const project = {
+    version: 1,
+    name: "自动保存样例",
+    updatedAt: new Date().toISOString(),
+    code: "// 自动保存样例\nvoid setup(){}\nvoid loop(){}\n",
+    diagram,
+    sketchDir: "",
+    fwDir: "",
+    flashPath: "",
+    fqbn: "",
+  };
+  try {
+    fs.mkdirSync(CONFIG_DIR, { recursive: true });
+    fs.writeFileSync(AUTOSAVE, JSON.stringify(project, null, 2), "utf8");
+    log(`已预置自动保存内容：${AUTOSAVE}`);
+  } catch (e) {
+    log(`预置自动保存内容失败（阶段 G 可能跳过）：${e.message}`);
   }
 }
 
@@ -123,9 +169,13 @@ const probe = `(() => {
     msg: (document.querySelector('.msgbar')||{}).textContent || '',
     flash: (document.querySelector('.path')||{}).textContent || '',
     boardLed: (boardEl && boardEl.querySelector('[data-board-led]')||{}).getAttribute?.('data-board-led') === '1',
+    parts: document.querySelectorAll('[data-part]').length,
     wires: document.querySelectorAll('[data-wire]').length,
     runDisabled: (document.querySelector('.btn-run')||{}).disabled,
     hasStop: !!document.querySelector('.btn-stop'),
+    projectTitle: (document.querySelector('[data-project-title]')||{}).textContent || '',
+    envPanel: !!document.querySelector('[data-testid="env-panel"]'),
+    envSummary: (document.querySelector('[data-env-summary]')||{}).getAttribute?.('data-env-summary') || '',
     termLen: term.length,
     termTail: term.slice(-400)
   };
@@ -438,7 +488,80 @@ async function stageCircuitPot() {
   return { ok: true };
 }
 
+/** E. 工程工具条：新建工程应清空电路图与源码改动标记 */
+async function stageProjectBar() {
+  await ensureStopped();
+  const before = await ui();
+  log(`F 工程: 新建前 元件 ${before.parts} 个 / 导线 ${before.wires} 条 / 标题「${before.projectTitle}」`);
+  if (before.wires === 0) return { ok: false, why: "前置状态异常：新建前导线数已为 0" };
+
+  await clickSel('[data-action="new"]');
+  await sleep(600);
+  const after = await ui();
+  log(`F 工程: 新建后 元件 ${after.parts} 个 / 导线 ${after.wires} 条 / 标题「${after.projectTitle}」`);
+  if (after.wires !== 0) return { ok: false, why: `新建后导线未清空（${after.wires} 条）` };
+  if (after.parts !== 1) return { ok: false, why: `新建后应只剩底板（当前 ${after.parts} 个元件）` };
+  if (!after.msg.includes("已新建工程")) return { ok: false, why: `未出现新建提示：${after.msg}` };
+  return { ok: true };
+}
+
+/** F. 环境自检：面板应列出全部检查项，且本机环境无缺失 */
+async function stageEnvCheck() {
+  await clickSel('[data-action="env-check"]');
+  let report = null;
+  const deadline = Date.now() + 60000;
+  while (Date.now() < deadline) {
+    await sleep(500);
+    const items = await evalJs(`(() => {
+      const list = Array.from(document.querySelectorAll('[data-env-item]'));
+      return {
+        count: list.length,
+        missing: list.filter(e => e.getAttribute('data-env-status') === 'missing').map(e => e.getAttribute('data-env-item')),
+        statuses: list.map(e => e.getAttribute('data-env-item') + ':' + e.getAttribute('data-env-status'))
+      };
+    })()`);
+    if (items.count >= 6 && !(await evalJs(`!!document.querySelector('.env-panel button[disabled]')`))) {
+      report = items;
+      break;
+    }
+    report = items;
+  }
+  const panel = await ui();
+  log(`G 自检: 面板=${panel.envPanel} 项数=${report ? report.count : 0} 缺失=${report ? report.missing.join(",") || "无" : "?"}`);
+  log(`G 自检: ${report ? report.statuses.join(", ") : "（无结果）"}`);
+  // 关闭面板，避免影响后续
+  await evalJs(`(() => {
+    const btns = Array.from(document.querySelectorAll('.env-head button'));
+    const close = btns.find(b => b.textContent.trim() === '关闭');
+    if (close) close.click();
+    return true;
+  })()`);
+  await sleep(300);
+  if (!panel.envPanel) return { ok: false, why: "自检面板未打开" };
+  if (!report || report.count < 6) return { ok: false, why: `自检项不足（${report ? report.count : 0} 项）` };
+  if (report.missing.length > 0) return { ok: false, why: `本机环境存在缺失项：${report.missing.join(", ")}` };
+  return { ok: true };
+}
+
+/** G. 自动保存恢复：预置一份 autosave.fmp，点「恢复上次编辑」应把它整份灌回 */
+async function stageRestoreSession() {
+  const has = await evalJs(`!!document.querySelector('[data-action="restore-session"]')`);
+  if (!has) return { ok: false, why: "未出现「恢复上次编辑」按钮（预置的自动保存内容未被识别）" };
+  await clickSel('[data-action="restore-session"]');
+  await sleep(900);
+  const p = await ui();
+  log(`E 恢复: 元件 ${p.parts} 个 / 导线 ${p.wires} 条 / 标题「${p.projectTitle}」/ 提示="${p.msg}"`);
+  if (!p.msg.includes("已恢复")) return { ok: false, why: `未出现恢复提示：${p.msg}` };
+  if (p.wires !== 2) return { ok: false, why: `恢复后导线数应为 2，实际 ${p.wires}` };
+  if (p.parts !== 2) return { ok: false, why: `恢复后元件数应为 2（底板 + LED），实际 ${p.parts}` };
+  if (!p.projectTitle.includes("自动保存样例")) {
+    return { ok: false, why: `工程名未恢复：${p.projectTitle}` };
+  }
+  return { ok: true };
+}
+
 // ===== 主流程 =====
+seedAutosave();
 killApp();
 await sleep(1500);
 log("启动应用:", EXE);
@@ -458,6 +581,7 @@ if (!(await waitForUi())) {
 let ready = false;
 for (let i = 0; i < 60; i++) {
   const p = await ui();
+  // [运行] 按钮可用即说明 DLL 已自动加载完成（按钮的 disabled 取决于 dllPath）
   if (p.runDisabled === false) {
     ready = true;
     break;
@@ -469,19 +593,19 @@ if (!ready) {
   killApp();
   process.exit(2);
 }
+// 注意：消息条只显示"最近一条"消息，启动时可能是自动保存提示而不是 DLL 提示，
+// 因此不再对消息文本做强断言 —— 上面「[运行] 可用」已经等价于 DLL 路径就绪。
 const init = await ui();
 log("初始状态:", JSON.stringify(init));
-if (!init.msg.includes("已自动加载")) {
-  log("失败: DLL 未自动加载 ->", init.msg);
-  killApp();
-  process.exit(2);
-}
 
 const stages = [
   ["A 板卡视图", stageBoard],
   ["B 电路图 LED", stageCircuitLed],
   ["C 电路图按键", stageCircuitButton],
   ["D 电路图电位器", stageCircuitPot],
+  ["E 自动保存恢复", stageRestoreSession],
+  ["F 工程工具条", stageProjectBar],
+  ["G 环境自检", stageEnvCheck],
 ];
 
 const failed = [];
@@ -503,5 +627,5 @@ if (failed.length > 0) {
   failed.forEach((f) => log("  - " + f));
   process.exit(2);
 }
-log("UI 自动化验证通过：板卡 LED 闪烁、电路图连线后 LED 闪烁、按键注入链路、电位器模拟量注入 四条链路全部成功");
+log("UI 自动化验证通过：板卡 LED、电路图 LED、按键注入、电位器注入、工程新建、环境自检、自动保存恢复 七条链路全部成功");
 process.exit(0);

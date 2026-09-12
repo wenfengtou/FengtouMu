@@ -10,6 +10,8 @@
     "tauri": "tauri",
     "build:release": "powershell -ExecutionPolicy Bypass -File scripts/build_release.ps1",
     "test:unit": "vitest run",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "test:rust:local": "cargo test --manifest-path src-tauri/Cargo.toml -- --include-ignored",
     "test:ui": "node scripts/ui_drive.mjs"
   },
   "dependencies": {

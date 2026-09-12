@@ -25,6 +25,7 @@ fn flash_path() -> &'static str {
 }
 
 #[test]
+#[ignore = "需要本机 lib/qemu/libqemu-xtensa.dll 与固件镜像（CI 不运行）；本地用 cargo test --test sim_integration -- --ignored --nocapture"]
 fn led_blinks_in_simulation() {
     let flash = flash_path();
     let core = SimCore::with_bus(Arc::new(RecordingBus::default()));

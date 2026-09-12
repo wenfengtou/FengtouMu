@@ -1,4 +1,6 @@
+pub mod envcheck;
 pub mod fsio;
+pub mod project;
 pub mod sim;
 
 use sim::worker_host::AppState;
@@ -30,6 +32,14 @@ pub fn run() {
             sim::buildchain::cmd_compile,
             fsio::cmd_read_text_file,
             fsio::cmd_write_text_file,
+            project::cmd_project_save,
+            project::cmd_project_load,
+            project::cmd_prefs_load,
+            project::cmd_prefs_save,
+            project::cmd_app_paths,
+            project::cmd_import_wokwi_zip,
+            project::cmd_export_wokwi_zip,
+            envcheck::cmd_env_check,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

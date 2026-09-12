@@ -1,9 +1,9 @@
 /** 编辑域：代码、工程目录、固件镜像，以及编译动作 */
 
 import { open } from "@tauri-apps/plugin-dialog";
-import { DEFAULT_SKETCH } from "../components/CodeEditor";
 import { DEFAULT_FLASH, DEFAULT_FW, DEFAULT_OUT, DEFAULT_SKETCH_DIR } from "../config";
 import { compileSketch } from "../lib/api";
+import { DEFAULT_SKETCH } from "../project/defaults";
 import { createStore } from "./store";
 import { setBusy, setMsg } from "./uiStore";
 

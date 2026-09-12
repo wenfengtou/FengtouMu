@@ -24,6 +24,7 @@ const FW_DIR: &str = r"D:\work\Esp32Qume\FengtouMu\lib\qemu\fw";
 const FLASH: &str = r"D:\work\Esp32Qume\FengtouMu\build_demo\picsimlab_gpio_demo.ino.merged.bin";
 
 #[test]
+#[ignore = "需要本机 lib/qemu/libqemu-xtensa.dll 与固件镜像（CI 不运行）；本地用 cargo test --test button_injection -- --ignored --nocapture"]
 fn boot_button_injection_api() {
     let core = SimCore::with_bus(Arc::new(RecordingBus::default()));
     install_sim_core(core).expect("SimCore 应未被其他测试占用");

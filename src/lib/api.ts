@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { AppPaths, Prefs, ProjectFile, WokwiImport } from "../project/format";
 
 export type SimStatus = "idle" | "loading" | "running" | "stopping" | "stopped";
 
@@ -51,6 +52,40 @@ export const compileSketch = (sketchDir: string, outputDir: string, fqbn?: strin
 export const readTextFile = (path: string) => invoke<string>("cmd_read_text_file", { path });
 export const writeTextFile = (path: string, contents: string) =>
   invoke<void>("cmd_write_text_file", { path, contents });
+
+// ---- 工程文件 / 偏好 / Wokwi 互导 ----
+export const projectSave = (path: string, project: ProjectFile) =>
+  invoke<void>("cmd_project_save", { path, project });
+export const projectLoad = (path: string) => invoke<ProjectFile>("cmd_project_load", { path });
+export const prefsLoad = () => invoke<Prefs>("cmd_prefs_load");
+export const prefsSave = (prefs: Prefs) => invoke<void>("cmd_prefs_save", { prefs });
+export const appPaths = () => invoke<AppPaths>("cmd_app_paths");
+export const importWokwiZip = (path: string, destDir: string) =>
+  invoke<WokwiImport>("cmd_import_wokwi_zip", { path, destDir });
+export const exportWokwiZip = (
+  path: string,
+  diagram: string,
+  sketch: string,
+  sketchName?: string,
+) => invoke<void>("cmd_export_wokwi_zip", { path, diagram, sketch, sketchName });
+
+// ---- 环境自检 ----
+export interface EnvCheckItem {
+  id: string;
+  name: string;
+  status: "ok" | "warn" | "missing";
+  detail: string;
+  hint: string;
+}
+
+export interface EnvReport {
+  ok: boolean;
+  missing: number;
+  items: EnvCheckItem[];
+}
+
+export const envCheck = (fwDir?: string, flashPath?: string) =>
+  invoke<EnvReport>("cmd_env_check", { fwDir, flashPath });
 
 // ---- 事件 ----
 export const onGpioUpdate = (cb: (s: PinState) => void): Promise<UnlistenFn> =>

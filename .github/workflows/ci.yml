@@ -1,0 +1,81 @@
+name: CI
+
+# 回归门禁：前端构建 + 前端单元测试 + Rust 无 GUI 测试。
+# 依赖本机 lib/qemu/libqemu-xtensa.dll 的用例（sim_integration / button_injection）标记为
+# #[ignore]，CI 不运行；本地用 npm run test:rust:local 全量跑。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  frontend:
+    name: frontend (build + unit tests)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 类型检查与构建（tsc + vite build）
+        run: npm run build
+
+      - name: 前端单元测试
+        run: npm run test:unit
+
+      # 供 rust job 使用：Tauri 的 generate_context! 需要 frontendDist 目录存在
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 3
+
+  rust:
+    name: rust (cargo check + test)
+    runs-on: windows-latest
+    needs: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      # tauri.conf.json 的 bundle.resources 指向 esp32-sim.exe，tauri-build 在编译期即校验其存在。
+      # 该文件是构建产物（.gitignore 已排除），CI 不跑 release 打包，因此放一个空文件占位；
+      # 它只用于满足编译期校验，不会被执行。
+      - name: 占位打包资源（仅用于编译期校验）
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path src-tauri/resources | Out-Null
+          if (-not (Test-Path src-tauri/resources/esp32-sim.exe)) {
+            New-Item -ItemType File -Path src-tauri/resources/esp32-sim.exe | Out-Null
+          }
+
+      - name: 编译检查（主程序 + 仿真子进程 + 测试）
+        run: cargo check --manifest-path src-tauri/Cargo.toml --bins --tests
+
+      - name: 测试（自动跳过需本机 DLL 的用例）
+        run: cargo test --manifest-path src-tauri/Cargo.toml

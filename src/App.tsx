@@ -2,10 +2,13 @@ import { useEffect } from "react";
 import BoardView from "./components/BoardView";
 import CircuitPanel from "./components/CircuitPanel";
 import CodeEditor from "./components/CodeEditor";
+import EnvPanel from "./components/EnvPanel";
+import ProjectBar from "./components/ProjectBar";
 import SerialTerminal from "./components/SerialTerminal";
 import { STATUS_TEXT } from "./config";
 import { PIN_BOOT } from "./lib/api";
 import { initCircuitBridge } from "./state/bridge";
+import { initEnvCheck } from "./state/envStore";
 import {
   compileCurrent,
   editorStore,
@@ -14,6 +17,7 @@ import {
   pickSketchDir,
   setCode,
 } from "./state/editorStore";
+import { initProject } from "./state/projectStore";
 import {
   clearUart,
   initSim,
@@ -43,6 +47,8 @@ function App() {
   useEffect(() => {
     initCircuitBridge();
     void initSim();
+    void initProject();
+    void initEnvCheck();
   }, []);
 
   const running = status === "running" || status === "loading" || status === "stopping";
@@ -54,8 +60,8 @@ function App() {
         <button onClick={() => void pickDllFile()} disabled={busy}>
           加载 DLL
         </button>
-        <button onClick={() => void pickSketchDir()} disabled={busy} title="Arduino 工程目录">
-          工程…
+        <button onClick={() => void pickSketchDir()} disabled={busy} title="Arduino 草图目录（含 .ino）">
+          草图目录…
         </button>
         <button onClick={() => void compileCurrent()} disabled={busy} title="用 arduino-cli 编译工程">
           编译
@@ -86,6 +92,8 @@ function App() {
         )}
         <span className={`status status-${status}`}>● {STATUS_TEXT[status]}</span>
       </header>
+
+      <ProjectBar />
 
       <div className="msgbar" title={msg}>
         {msg || "就绪：加载 DLL → 编译或选择固件 → 运行仿真"}
@@ -133,6 +141,8 @@ function App() {
           onClear={clearUart}
         />
       </footer>
+
+      <EnvPanel />
     </div>
   );
 }

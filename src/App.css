@@ -402,3 +402,285 @@ body {
   border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
+
+/* ---- 工程工具条（M3-1） ---- */
+.project-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: var(--bg-panel2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.project-bar button {
+  background: var(--bg-panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.project-bar button:hover:not(:disabled) {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+
+.project-bar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.project-title {
+  font-weight: 600;
+  color: var(--accent);
+  margin-right: 4px;
+}
+
+.project-path {
+  color: var(--text-dim);
+  font-size: 11px;
+  max-width: 380px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-bar .btn-session {
+  background: #4a3a12;
+  border-color: #8a6d1f;
+  color: #ffe082;
+}
+
+.recent-wrap {
+  position: relative;
+}
+
+.recent-list {
+  position: absolute;
+  top: 26px;
+  left: 0;
+  z-index: 30;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  min-width: 320px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+}
+
+.recent-list button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text);
+  text-align: left;
+}
+
+.recent-list button:hover {
+  background: var(--accent-dim);
+}
+
+.recent-name {
+  font-size: 12px;
+}
+
+.recent-path {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+/* ---- 环境自检面板（M3-2） ---- */
+.env-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 10, 16, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.env-panel {
+  width: 720px;
+  max-width: 92vw;
+  max-height: 84vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+.env-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.env-head button {
+  background: var(--bg-panel2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.env-summary {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.env-summary-ok {
+  background: #24421f;
+  color: #b7e2a5;
+}
+
+.env-summary-bad {
+  background: #4a2424;
+  color: #ffb4b4;
+}
+
+.env-paths {
+  padding: 8px 14px;
+  color: var(--text-dim);
+  font-size: 11px;
+  border-bottom: 1px solid var(--border);
+  line-height: 1.7;
+}
+
+.env-paths code {
+  color: var(--text);
+}
+
+.env-path-actions {
+  margin-top: 6px;
+  display: flex;
+  gap: 6px;
+}
+
+.env-path-actions button {
+  background: var(--bg-panel2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 8px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.env-list {
+  margin: 0;
+  padding: 8px 14px;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.env-item {
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 6px;
+  background: var(--bg-panel2);
+}
+
+.env-ok {
+  border-left-color: var(--green);
+}
+
+.env-warn {
+  border-left-color: var(--amber);
+}
+
+.env-missing {
+  border-left-color: var(--red);
+}
+
+.env-item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.env-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-dim);
+}
+
+.env-ok .env-dot {
+  background: var(--green);
+}
+
+.env-warn .env-dot {
+  background: var(--amber);
+}
+
+.env-missing .env-dot {
+  background: var(--red);
+}
+
+.env-name {
+  font-weight: 600;
+}
+
+.env-status {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.env-detail {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+  word-break: break-all;
+}
+
+.env-hint {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--amber);
+}
+
+.env-error {
+  margin: 8px 14px 0;
+  padding: 6px 10px;
+  font-size: 11px;
+  color: #ffb4b4;
+  background: #3a1f1f;
+  border-radius: 5px;
+}
+
+.env-foot {
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.env-foot code {
+  color: var(--accent);
+}
+
