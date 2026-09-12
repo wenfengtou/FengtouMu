@@ -40,6 +40,8 @@ struct Shared {
     pending: Mutex<HashMap<u64, Sender<Value>>>,
     /// 引脚活动计数：每收到一次 gpio-update 递增（= 固件确实在驱动 GPIO）
     activity: Mutex<u64>,
+    /// 最近一次引脚活动时间（用于判断"是否仍在持续运行"）
+    last_activity: Mutex<Option<Instant>>,
     /// 串口累计字节数（ROM 卡死时约几百字节即停止；进入应用后持续增长）
     uart_bytes: Mutex<u64>,
     cv: Condvar,
@@ -57,6 +59,7 @@ impl Shared {
         Self {
             pending: Mutex::new(HashMap::new()),
             activity: Mutex::new(0),
+            last_activity: Mutex::new(None),
             uart_bytes: Mutex::new(0),
             cv: Condvar::new(),
             start_error: Mutex::new(None),
@@ -191,6 +194,7 @@ impl SimHost {
                                     }
                                 }
                                 *shared.activity.lock().unwrap() += 1;
+                                *shared.last_activity.lock().unwrap() = Some(Instant::now());
                                 shared.cv.notify_all();
                             }
                             "sim-status" => {
@@ -288,6 +292,7 @@ impl SimHost {
         for attempt in 1..=attempts {
             {
                 *self.shared.activity.lock().unwrap() = 0;
+                *self.shared.last_activity.lock().unwrap() = None;
                 *self.shared.uart_bytes.lock().unwrap() = 0;
                 *self.shared.start_error.lock().unwrap() = None;
                 *self.shared.exited.lock().unwrap() = false;
@@ -298,15 +303,23 @@ impl SimHost {
             self.set_status(SimStatus::Loading);
 
             // 健康判据（避免把 ROM 卡死误判为成功）：
-            //   - 引脚电平变化 ≥2 次（固件在驱动 GPIO，例如 LED 闪烁），或
-            //   - 串口输出 ≥600 字节（已进入应用的日志阶段；ROM 卡死通常停在 300-400 字节）
+            //   - 引脚仍在**持续**变化：累计 ≥2 次 且 最近一次活动在 2 秒内
+            //     （LED 闪烁等周期性驱动必然满足；卡死时活动会停止、时间戳变旧），或
+            //   - 串口输出 ≥1500 字节（已进入应用日志阶段；ROM 卡死通常远小于此）
             let deadline = Instant::now() + Duration::from_secs(health_secs);
             let mut ok = false;
             let mut fatal: Option<String> = None;
             while Instant::now() < deadline {
                 let act = *self.shared.activity.lock().unwrap();
+                let recent = self
+                    .shared
+                    .last_activity
+                    .lock()
+                    .unwrap()
+                    .map(|t| t.elapsed() < Duration::from_secs(2))
+                    .unwrap_or(false);
                 let uart = *self.shared.uart_bytes.lock().unwrap();
-                if act >= 2 || uart >= 600 {
+                if (act >= 2 && recent) || uart >= 1500 {
                     ok = true;
                     break;
                 }

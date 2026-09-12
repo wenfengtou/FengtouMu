@@ -51,13 +51,16 @@ async function getPageWs() {
 
 const probe = `(() => {
   const board = (document.querySelector('.board-svg')||{}).textContent || '';
+  const term = Array.from(document.querySelectorAll('.terminal-line')).map(e=>e.textContent).join('\\n');
   return {
     status: (document.querySelector('.status')||{}).textContent || '',
     msg: (document.querySelector('.msgbar')||{}).textContent || '',
     flash: (document.querySelector('.path')||{}).textContent || '',
     led: board.includes('运行中'),
     runDisabled: (document.querySelector('.btn-run')||{}).disabled,
-    hasStop: !!document.querySelector('.btn-stop')
+    hasStop: !!document.querySelector('.btn-stop'),
+    termLen: term.length,
+    termTail: term.slice(-400)
   };
 })()`;
 
@@ -91,7 +94,11 @@ async function runOnce(label) {
     if (last !== null && cur.led !== last) flips++;
     last = cur.led;
   }
-  if (flips < 3) return { ok: false, why: `LED 未正常闪烁（${LED_SAMPLE_MS / 1000} 秒仅翻转 ${flips} 次）` };
+  if (flips < 3) {
+    let diag = {};
+    try { diag = await ui(); } catch { /* ignore */ }
+    return { ok: false, why: `LED 未正常闪烁（${LED_SAMPLE_MS / 1000} 秒翻转 ${flips} 次）| 串口长度=${diag.termLen} | 串口尾部=${JSON.stringify((diag.termTail || "").split("\n").slice(-6).join(" / "))}` };
+  }
   log(`${label}: LED 闪烁正常（${LED_SAMPLE_MS / 1000} 秒翻转 ${flips} 次）`);
 
   await sleep(RUN_HOLD_MS);
