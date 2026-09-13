@@ -1,4 +1,4 @@
-//! 工程文件（`.fmp`）与偏好设置：读写、最近工程列表、Wokwi 兼容 zip 互导。
+//! 工程文件（`.vlx`）与偏好设置：读写、最近工程列表、Wokwi 兼容 zip 互导、本地项目库。
 //!
 //! 设计取向：电路图仍然以 `diagram.json` 文本原样存放，Rust 侧不认识元件模型，
 //! 只负责「把一段 JSON 存下来 / 读出来」，电路语义全部留在前端。
@@ -11,22 +11,32 @@ use tauri::{AppHandle, Manager};
 /// 工程文件格式版本，后续做迁移时用它判断。
 pub const PROJECT_VERSION: u32 = 1;
 
+/// 工程文件格式标识：`.vlx` 自包含快照。
+pub const VLX_FORMAT: &str = "fengtoumu-project";
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
+    /// 格式标识；`.vlx` 为 `fengtoumu-project`。旧 `.fmp` 无此字段（serde default 兼容）。
+    #[serde(default)]
+    pub format: String,
     pub version: u32,
     pub name: String,
     #[serde(default)]
     pub updated_at: String,
-    /// 创建时间（项目库条目用；外部 .fmp 可能缺失，空串即可）
+    /// 创建时间（项目库条目用；外部文件可能缺失，空串即可）
     #[serde(default)]
     pub created_at: String,
-    /// Arduino 源码（当前编辑器内容）
+    /// Arduino 源码（当前编辑器内容，兼容旧 .fmp 的单文件字段）
     #[serde(default)]
     pub code: String,
+    /// 源码文件列表（`.vlx` 自包含：名称 + 内容全部内嵌）。旧 .fmp 无此字段。
+    #[serde(default)]
+    pub files: Vec<ProjectFileEntry>,
     /// diagram.json 文本（Wokwi 兼容）
     #[serde(default)]
     pub diagram: String,
+    /// 以下为可选的本机路径信息：自包含工程里不参与内容比较，仅当同机继续编辑时作为加速。
     #[serde(default)]
     pub sketch_dir: String,
     #[serde(default)]
@@ -35,6 +45,14 @@ pub struct Project {
     pub flash_path: String,
     #[serde(default)]
     pub fqbn: String,
+}
+
+/// `.vlx` 里的源码文件条目。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectFileEntry {
+    pub name: String,
+    pub content: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,7 +142,7 @@ pub fn cmd_app_paths(app: AppHandle) -> Result<AppPaths, String> {
     Ok(AppPaths {
         config_dir: dir.to_string_lossy().to_string(),
         prefs_path: dir.join("prefs.json").to_string_lossy().to_string(),
-        autosave_path: dir.join("autosave.fmp").to_string_lossy().to_string(),
+        autosave_path: dir.join("autosave.vlx").to_string_lossy().to_string(),
     })
 }
 
@@ -334,7 +352,7 @@ pub fn cmd_library_list(app: AppHandle) -> Result<Vec<LibraryEntry>, String> {
     for e in std::fs::read_dir(&dir).map_err(|e| format!("读取项目库失败: {e}"))? {
         let e = e.map_err(|e| format!("读取项目库条目失败: {e}"))?;
         let p = e.path();
-        if p.extension().map(|x| x.eq_ignore_ascii_case("fmp")).unwrap_or(false) {
+        if p.extension().map(|x| x.eq_ignore_ascii_case("vlx")).unwrap_or(false) {
             if let Some(id) = p.file_stem().map(|s| s.to_string_lossy().to_string()) {
                 let entry = match serde_json::from_str::<Project>(&read_text(&p)?) {
                     Ok(proj) => LibraryEntry {
@@ -358,7 +376,7 @@ pub fn cmd_library_list(app: AppHandle) -> Result<Vec<LibraryEntry>, String> {
     Ok(out)
 }
 
-/// 从项目库删除一个工程（按 id 删除对应的 .fmp 文件）。
+/// 从项目库删除一个工程（按 id 删除对应的 .vlx 文件）。
 #[tauri::command]
 pub fn cmd_library_delete(app: AppHandle, id: String) -> Result<(), String> {
     // 防路径穿越：id 只允许字母/数字/中划线/下划线
@@ -369,7 +387,7 @@ pub fn cmd_library_delete(app: AppHandle, id: String) -> Result<(), String> {
     if safe.is_empty() || safe != id {
         return Err("非法的项目 id".into());
     }
-    let path = library_dir(&app)?.join(format!("{safe}.fmp"));
+    let path = library_dir(&app)?.join(format!("{safe}.vlx"));
     match std::fs::remove_file(&path) {
         Ok(_) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),

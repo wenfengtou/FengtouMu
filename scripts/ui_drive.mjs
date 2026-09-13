@@ -6,7 +6,8 @@
 //   B 电路图：放置 LED → 连线 GPIO2/GND → 运行 → 画布上的 LED 闪烁 → 停止
 //   C 电路图 + 按键：放置按键 → 连线 GPIO0/GND → 运行 → 按住 → 界面按键状态更新 → 停止
 //   D 电路图 + 电位器：放置电位器 → SIG 接 GPIO34 → 运行 → 拖动旋钮 → 读数改变且注入无报错 → 停止
-//   E 自动保存恢复：预置 autosave.fmp → 点「恢复上次编辑」→ 内容与工程名被整份灌回
+//   E 自动保存恢复：预置 autosave.vlx → 点「恢复上次编辑」→ 内容与工程名被整份灌回
+//   H 一键编译：点「编译」→ arduino-cli 产出合并镜像、固件路径切到 *.ino.merged.bin
 //   F 工程工具条：点「新建」→ 电路图与导线清空、标题回到未命名工程
 //   G 环境自检：点「环境自检」→ 面板列出全部检查项且本机无缺失
 //   H 一键编译：点「编译」→ arduino-cli 产出合并镜像、固件路径切到 *.ino.merged.bin
@@ -27,7 +28,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const EXE = path.join(__dirname, "..", "src-tauri", "target", "release", "esp32-ide.exe");
 // Tauri 的应用数据目录：%APPDATA%\<identifier>
 const CONFIG_DIR = path.join(process.env.APPDATA ?? "", "com.lwf.esp32-ide");
-const AUTOSAVE = path.join(CONFIG_DIR, "autosave.fmp");
+const AUTOSAVE = path.join(CONFIG_DIR, "autosave.vlx");
 const CDP = "http://127.0.0.1:9222";
 const START_TIMEOUT_MS = 150000;
 const LED_SAMPLE_MS = 25000;
@@ -70,10 +71,12 @@ function seedAutosave() {
     ],
   });
   const project = {
+    format: "fengtoumu-project",
     version: 1,
     name: "自动保存样例",
     updatedAt: new Date().toISOString(),
     code: "// 自动保存样例\nvoid setup(){}\nvoid loop(){}\n",
+    files: [{ name: "sketch.ino", content: "// 自动保存样例\nvoid setup(){}\nvoid loop(){}\n" }],
     diagram,
     sketchDir: "",
     fwDir: "",
@@ -576,7 +579,7 @@ async function stageEnvCheck() {
   return { ok: true };
 }
 
-/** G. 自动保存恢复：预置一份 autosave.fmp，点「恢复上次编辑」应把它整份灌回 */
+/** G. 自动保存恢复：预置一份 autosave.vlx，点「恢复上次编辑」应把它整份灌回 */
 async function stageRestoreSession() {
   const has = await evalJs(`!!document.querySelector('[data-action="restore-session"]')`);
   if (!has) return { ok: false, why: "未出现「恢复上次编辑」按钮（预置的自动保存内容未被识别）" };

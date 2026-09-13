@@ -17,10 +17,18 @@ fn tmp_dir(tag: &str) -> PathBuf {
 
 fn sample_project() -> Project {
     Project {
+        format: "fengtoumu-project".into(),
         version: PROJECT_VERSION,
         name: "闪烁灯".into(),
         updated_at: "2026-09-12T00:00:00.000Z".into(),
+        created_at: "2026-09-12T00:00:00.000Z".into(),
         code: "void setup(){}\nvoid loop(){}\n".into(),
+        files: vec![
+            esp32_ide_lib::project::ProjectFileEntry {
+                name: "sketch.ino".into(),
+                content: "void setup(){}\nvoid loop(){}\n".into(),
+            },
+        ],
         diagram: r#"{"parts":[{"type":"board-esp32-devkitc","id":"esp","top":0,"left":0}],"connections":[]}"#.into(),
         sketch_dir: r"D:\work\sk".into(),
         fw_dir: r"D:\work\fw".into(),
@@ -32,7 +40,7 @@ fn sample_project() -> Project {
 #[test]
 fn project_file_round_trip() {
     let dir = tmp_dir("project");
-    let path = dir.join("灯.fmp");
+    let path = dir.join("灯.vlx");
     let path_s = path.to_string_lossy().to_string();
 
     let original = sample_project();
@@ -43,6 +51,8 @@ fn project_file_round_trip() {
     assert_eq!(loaded.version, original.version);
     assert_eq!(loaded.name, original.name);
     assert_eq!(loaded.code, original.code);
+    assert_eq!(loaded.files.len(), 1);
+    assert_eq!(loaded.files[0].name, "sketch.ino");
     assert_eq!(loaded.diagram, original.diagram);
     assert_eq!(loaded.sketch_dir, original.sketch_dir);
     assert_eq!(loaded.flash_path, original.flash_path);

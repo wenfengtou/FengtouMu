@@ -1,24 +1,45 @@
 /**
- * 工程文件（`.fmp`）格式与纯函数工具。
+ * 工程文件（`.vlx`）格式与纯函数工具。
+ *
+ * `.vlx` 是自包含快照：源码文件（files[]）与电路图（diagram 文本）全部内嵌，
+ * 不依赖任何外部目录路径 —— 文件拷到任何电脑/位置都能完整还原。
+ * 兼容读取：旧 `.fmp`（无 format 字段的单文件 code 结构）与 velxio/circuit-muse
+ * 的 `.vlx`（format: velxio-project / circuit-muse-project，fileGroups 结构）。
  *
  * 与 Rust 侧 `project.rs` 的 `Project` 结构一一对应（camelCase）。
  * 这里只做「组装 / 解析 / 校验」，不触碰任何界面或仿真状态，便于单元测试。
  */
 
 export const PROJECT_VERSION = 1;
-export const PROJECT_EXT = "fmp";
+/** 工程文件扩展名：`.vlx`（自包含） */
+export const PROJECT_EXT = "vlx";
+/** 本应用 `.vlx` 的格式标识 */
+export const VLX_FORMAT = "fengtoumu-project";
+/** 兼容读取的外部格式标识 */
+export const VLX_FORMATS = new Set(["velxio-project", "circuit-muse-project"]);
+
+/** `.vlx` 里的源码文件条目 */
+export interface ProjectFileEntry {
+  name: string;
+  content: string;
+}
 
 /** 工程文件内容 */
 export interface ProjectFile {
+  /** 格式标识；本应用 `.vlx` 为 `fengtoumu-project`；旧 .fmp 无此字段 */
+  format?: string;
   version: number;
   name: string;
   updatedAt: string;
-  /** 创建时间（项目库条目用；外部 .fmp 可能缺失） */
+  /** 创建时间（项目库条目用；外部文件可能缺失） */
   createdAt?: string;
-  /** Arduino 源码 */
+  /** 源码文件列表（`.vlx` 自包含：名称 + 内容全部内嵌） */
+  files: ProjectFileEntry[];
+  /** 当前主源码（编辑器内容；兼容旧 .fmp 的单文件字段） */
   code: string;
   /** diagram.json 文本（Wokwi 兼容） */
   diagram: string;
+  /** 以下为可选的本机路径信息：仅同机继续编辑时作为加速，不参与内容比较 */
   sketchDir: string;
   fwDir: string;
   flashPath: string;
@@ -73,15 +94,23 @@ export interface BuildProjectInput {
   fqbn?: string;
   updatedAt?: string;
   createdAt?: string;
+  /** 附加源码文件（`.vlx` 自包含用）；主源码自动并入 files 首位 */
+  extraFiles?: Array<{ name: string; content: string }>;
 }
 
-/** 组装一份工程文件（时间戳默认取当前时间） */
+/** 组装一份 `.vlx` 工程文件（时间戳默认取当前时间；源码与电路图全部内嵌） */
 export function buildProjectFile(input: BuildProjectInput): ProjectFile {
+  const now = new Date().toISOString();
   return {
+    format: VLX_FORMAT,
     version: PROJECT_VERSION,
     name: input.name || DEFAULT_PROJECT_NAME,
-    updatedAt: input.updatedAt ?? new Date().toISOString(),
-    createdAt: input.createdAt ?? new Date().toISOString(),
+    updatedAt: input.updatedAt ?? now,
+    createdAt: input.createdAt ?? now,
+    files: [
+      { name: "sketch.ino", content: input.code },
+      ...(input.extraFiles ?? []),
+    ],
     code: input.code,
     diagram: input.diagram,
     sketchDir: input.sketchDir,
@@ -91,11 +120,11 @@ export function buildProjectFile(input: BuildProjectInput): ProjectFile {
   };
 }
 
-/** 从文件路径推断工程名：`D:\x\闪烁灯.fmp` → `闪烁灯` */
+/** 从文件路径推断工程名：`D:\x\闪烁灯.vlx` → `闪烁灯` */
 export function projectNameFromPath(path: string): string {
   if (!path) return DEFAULT_PROJECT_NAME;
   const base = path.split(/[\\/]/).pop() ?? "";
-  const stem = base.replace(/\.(fmp|json)$/i, "");
+  const stem = base.replace(/\.(vlx|fmp|json|zip)$/i, "");
   return stem || DEFAULT_PROJECT_NAME;
 }
 
@@ -109,7 +138,7 @@ export function projectFileName(name: string): string {
 }
 
 /**
- * 解析工程文件文本。
+ * 解析工程文件文本（`.vlx`，兼容旧 `.fmp` 与 velxio/circuit-muse 的 `.vlx`）。
  * 返回 `project: null` 表示这不是一份可用的工程文件，具体原因在 `errors` 中。
  */
 export function parseProjectFile(text: string): { project: ProjectFile | null; errors: string[] } {
@@ -125,6 +154,11 @@ export function parseProjectFile(text: string): { project: ProjectFile | null; e
   }
   const o = raw as Record<string, unknown>;
   const str = (k: string): string => (typeof o[k] === "string" ? (o[k] as string) : "");
+  const arr = (k: string): unknown[] => (Array.isArray(o[k]) ? (o[k] as unknown[]) : []);
+  const obj = (k: string): Record<string, unknown> =>
+    typeof o[k] === "object" && o[k] !== null && !Array.isArray(o[k])
+      ? (o[k] as Record<string, unknown>)
+      : {};
 
   const version = typeof o.version === "number" ? o.version : 0;
   if (version > PROJECT_VERSION) {
@@ -133,21 +167,75 @@ export function parseProjectFile(text: string): { project: ProjectFile | null; e
   if (version === 0) {
     errors.push(`缺少 version 字段（当前支持 ${PROJECT_VERSION}）`);
   }
-  const looksLikeProject = Boolean(str("code") || str("diagram"));
+
+  // 识别 velxio / circuit-muse 的 .vlx：源码在 fileGroups 里，按组平铺
+  const format = str("format");
+  let files: Array<{ name: string; content: string }> = [];
+  let code = str("code");
+  let diagram = str("diagram");
+  let sketchDir = str("sketchDir");
+  let fwDir = str("fwDir");
+  let flashPath = str("flashPath");
+
+  if (VLX_FORMATS.has(format)) {
+    const fileGroups = obj("fileGroups");
+    for (const gid of Object.keys(fileGroups)) {
+      const group = fileGroups[gid];
+      if (!Array.isArray(group)) continue;
+      for (const f of group) {
+        const fo = f as Record<string, unknown>;
+        const name = typeof fo.name === "string" ? fo.name : "";
+        const content = typeof fo.content === "string" ? fo.content : "";
+        if (name) files.push({ name, content });
+      }
+    }
+    if (!code) {
+      const ino = files.find((f) => f.name.toLowerCase().endsWith(".ino"));
+      code = ino ? ino.content : (files[0]?.content ?? "");
+    }
+    // 外部工程没有 FengtouMu 路径信息；若电路图缺失则给空（后续由 UI 提示仅代码可还原）
+    diagram = str("diagram");
+    if (files.length > 0) {
+      sketchDir = "";
+      fwDir = "";
+      flashPath = "";
+    }
+  } else {
+    // 本应用 .vlx（format=fengtoumu-project）或旧 .fmp（无 format）：files 数组为权威
+    if (o.files !== undefined) {
+      for (const f of arr("files")) {
+        const fo = f as Record<string, unknown>;
+        const name = typeof fo.name === "string" ? fo.name : "";
+        const content = typeof fo.content === "string" ? fo.content : "";
+        if (name) files.push({ name, content });
+      }
+      if (!code) {
+        const ino = files.find((f) => f.name.toLowerCase().endsWith(".ino"));
+        code = ino ? ino.content : (files[0]?.content ?? "");
+      }
+    }
+    sketchDir = str("sketchDir");
+    fwDir = str("fwDir");
+    flashPath = str("flashPath");
+  }
+
+  const looksLikeProject = Boolean(code || diagram || files.length > 0);
   if (!looksLikeProject) {
-    errors.push("既没有 code 也没有 diagram，可能不是 FengtouMu 工程文件");
+    errors.push("既没有源码也没有电路图，可能不是工程文件");
   }
 
   const project: ProjectFile = {
+    format: format || VLX_FORMAT,
     version: version || PROJECT_VERSION,
     name: str("name") || DEFAULT_PROJECT_NAME,
     updatedAt: str("updatedAt"),
     createdAt: str("createdAt") || undefined,
-    code: str("code"),
-    diagram: str("diagram"),
-    sketchDir: str("sketchDir"),
-    fwDir: str("fwDir"),
-    flashPath: str("flashPath"),
+    files,
+    code,
+    diagram,
+    sketchDir,
+    fwDir,
+    flashPath,
     fqbn: str("fqbn") || DEFAULT_FQBN,
   };
 
@@ -164,12 +252,16 @@ export function touchRecent(list: RecentEntry[], entry: RecentEntry, max = 8): R
 
 /** 两份工程内容是否等价（用于判断"有没有改动"） */
 export function sameProjectContent(a: ProjectFile, b: ProjectFile): boolean {
+  // files 按 (name,content) 排序后比较，等价于比较全部源码文件集合
+  const key = (f: Array<{ name: string; content: string }>) =>
+    [...f]
+      .sort((x, y) => x.name.localeCompare(y.name))
+      .map((f2) => `${f2.name}\u0000${f2.content}`)
+      .join("\u0001");
   return (
+    key(a.files) === key(b.files) &&
     a.code === b.code &&
     a.diagram === b.diagram &&
-    a.sketchDir === b.sketchDir &&
-    a.fwDir === b.fwDir &&
-    a.flashPath === b.flashPath &&
     a.fqbn === b.fqbn
   );
 }

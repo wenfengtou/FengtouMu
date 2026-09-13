@@ -70,7 +70,7 @@ export default function FileExplorer() {
             ))}
             <div className="file-explorer-item fe-file-item" title="FengtouMu project file">
               <span className="file-explorer-icon">◫</span>
-              <span className="file-explorer-name">{name || "untitled"}.fmp</span>
+              <span className="file-explorer-name">{name || "untitled"}.vlx</span>
             </div>
           </div>
         </div>

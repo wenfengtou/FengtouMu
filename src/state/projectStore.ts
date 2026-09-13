@@ -4,7 +4,7 @@
  * 职责边界：
  *   - 工程文件只存"内容"（源码 + diagram.json + 路径配置），不存运行状态；
  *   - 与编辑器/电路两个域通过 applyProject / snapshot 双向同步；
- *   - 自动保存写到应用数据目录下的 autosave.fmp，重启后可在工程菜单里恢复。
+ *   - 自动保存写到应用数据目录下的 autosave.vlx，重启后可在工程菜单里恢复。
  */
 
 import { open, save } from "@tauri-apps/plugin-dialog";
@@ -175,7 +175,7 @@ function newLibraryId(): string {
 }
 
 /**
- * 把当前工作区快照保存到项目库（`<configDir>/projects/<id>.fmp`）。
+ * 把当前工作区快照保存到项目库（`<configDir>/projects/<id>.vlx`）。
  * - 当前工作区已有 libraryId → 覆盖该条目；
  * - 没有 → 自动分配新 id 并登记（新建工程 / 导入的文件也进库，与 CircuitMuse 一致）。
  */
@@ -183,7 +183,7 @@ export async function saveToLibrary(): Promise<void> {
   const st = projectStore.get();
   if (!st.paths) return;
   const id = st.libraryId ?? newLibraryId();
-  const path = `${st.paths.configDir}\\projects\\${id}.fmp`;
+  const path = `${st.paths.configDir}\\projects\\${id}.vlx`;
   try {
     await projectSave(path, snapshot());
     projectStore.set({ libraryId: id, autosavedAt: Date.now() });
@@ -202,7 +202,7 @@ export async function openFromLibrary(id: string): Promise<void> {
   }
   try {
     const { project, errors } = parseProjectFile(
-      await readTextFile(`${st.paths.configDir}\\projects\\${id}.fmp`),
+      await readTextFile(`${st.paths.configDir}\\projects\\${id}.vlx`),
     );
     if (!project) {
       setMsg(`打开失败：${errors.join("；")}`);
@@ -368,13 +368,22 @@ export async function openProjectPath(path: string): Promise<void> {
   }
 }
 
-/** 弹出文件选择框打开工程 */
+/** 弹出文件选择框打开工程（.vlx 为主；兼容旧 .fmp 与 Wokwi .zip） */
 export async function openProject(): Promise<void> {
   const file = await open({
     title: "打开工程",
-    filters: [{ name: "FengtouMu 工程", extensions: [PROJECT_EXT, "json"] }],
+    filters: [
+      { name: "FengtouMu 工程 (.vlx)", extensions: [PROJECT_EXT] },
+      { name: "旧版工程 (.fmp)", extensions: ["fmp"] },
+      { name: "Wokwi 工程 (.zip)", extensions: ["zip"] },
+      { name: "工程 JSON", extensions: ["json"] },
+    ],
   });
   if (typeof file !== "string") return;
+  if (file.toLowerCase().endsWith(".zip")) {
+    await importWokwiProject();
+    return;
+  }
   await openProjectPath(file);
 }
 
@@ -395,13 +404,13 @@ export async function saveProject(): Promise<void> {
   }
 }
 
-/** 另存为 */
+/** 另存为（`.vlx` 自包含快照） */
 export async function saveProjectAs(): Promise<void> {
   const st = projectStore.get();
   const path = await save({
     title: "工程另存为",
     defaultPath: projectFileName(st.name),
-    filters: [{ name: "FengtouMu 工程", extensions: [PROJECT_EXT] }],
+    filters: [{ name: "FengtouMu 工程 (.vlx)", extensions: [PROJECT_EXT] }],
   });
   if (typeof path !== "string") return;
   const name = projectNameFromPath(path);
