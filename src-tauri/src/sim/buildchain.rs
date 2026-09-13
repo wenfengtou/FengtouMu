@@ -267,8 +267,14 @@ pub fn compile(
     }
 }
 
+/// 一键编译入口。
+///
+/// 必须是 async command：Tauri 2 中不带 `async` 的命令默认在主线程执行，
+/// 而 `compile()` 内部 `Command::output()` 会阻塞等待 arduino-cli 编译
+/// （1-3 分钟），会把整个 UI 冻结。async + spawn_blocking 把编译挪到
+/// 阻塞线程池，主线程只负责等待结果，界面保持可交互。
 #[tauri::command]
-pub fn cmd_compile(
+pub async fn cmd_compile(
     sketch_dir: String,
     output_dir: String,
     fqbn: Option<String>,
@@ -279,10 +285,11 @@ pub fn cmd_compile(
         "esp32:esp32:esp32:FlashMode=dio,FlashFreq=40,FlashSize=4M,PartitionScheme=default,PSRAM=disabled"
             .to_string()
     });
-    compile(
-        Path::new(&sketch_dir),
-        &fqbn,
-        Path::new(&output_dir),
-        code.as_deref(),
-    )
+    let sketch_dir = PathBuf::from(sketch_dir);
+    let output_dir = PathBuf::from(output_dir);
+    tauri::async_runtime::spawn_blocking(move || {
+        compile(&sketch_dir, &fqbn, &output_dir, code.as_deref())
+    })
+    .await
+    .map_err(|e| format!("编译任务调度失败: {e}"))?
 }
