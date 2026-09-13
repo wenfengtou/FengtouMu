@@ -8,8 +8,9 @@
 
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { CATALOG, pinAbsPos } from "../circuit/catalog";
-import { pinKey, type Part, type PartType, type PinRef } from "../circuit/types";
+import { pinKey, type Connection, type Part, type PartType } from "../circuit/types";
 import { changePot, pressPart, togglePart } from "../state/bridge";
+import { connectionColor, waypointPath } from "../circuit/wire";
 import WokwiPart from "./WokwiPart";
 import {
   addPart,
@@ -21,6 +22,7 @@ import {
   removePart,
   selectPart,
   selectWire,
+  updateConnectionWaypoints,
 } from "../state/circuitStore";
 import { simStore } from "../state/simStore";
 import { useStore } from "../state/store";
@@ -31,6 +33,47 @@ const MIN_SCALE = 0.5;
 const MAX_SCALE = 2.2;
 
 const snap = (v: number): number => Math.round(v / SNAP) * SNAP;
+
+/** 双击点投影到最近线段上，插入一个正交拐点（对齐到线段所在轴） */
+function insertWaypointAt(
+  waypoints: Array<{ x: number; y: number }>,
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  px: number,
+  py: number,
+): Array<{ x: number; y: number }> {
+  const pts = [a, ...waypoints, b];
+  let bestIdx = -1;
+  let best: { x: number; y: number } | null = null;
+  let bestDist = Infinity;
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) continue;
+    let t = ((px - p1.x) * dx + (py - p1.y) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    const projX = p1.x + t * dx;
+    const projY = p1.y + t * dy;
+    const dist = Math.hypot(px - projX, py - projY);
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestIdx = i;
+      best = { x: Math.round(projX), y: Math.round(projY) };
+    }
+  }
+  if (!best || bestIdx < 0) return waypoints;
+  // 对齐到线段所在轴，保持正交折线连续
+  const p1 = pts[bestIdx];
+  const p2 = pts[bestIdx + 1];
+  if (Math.abs(p1.y - p2.y) < 1e-6) best = { ...best, y: p1.y }; // 水平段
+  else best = { ...best, x: p1.x }; // 垂直段
+  const before = waypoints.slice(0, bestIdx);
+  const after = waypoints.slice(bestIdx);
+  return [...before, best, ...after];
+}
 
 export default function CircuitCanvas() {
   const diagram = useStore(circuitStore, (s) => s.diagram);
@@ -374,16 +417,14 @@ export default function CircuitCanvas() {
     }
   };
 
-  const wirePath = (from: PinRef, to: PinRef): string | null => {
-    const p1 = diagram.parts.find((p) => p.id === from.part);
-    const p2 = diagram.parts.find((p) => p.id === to.part);
+  const wirePath = (c: Connection): string | null => {
+    const p1 = diagram.parts.find((p) => p.id === c.from.part);
+    const p2 = diagram.parts.find((p) => p.id === c.to.part);
     if (!p1 || !p2) return null;
-    const a = pinAbsPos(p1.type, p1.x, p1.y, from.pin);
-    const b = pinAbsPos(p2.type, p2.x, p2.y, to.pin);
+    const a = pinAbsPos(p1.type, p1.x, p1.y, c.from.pin);
+    const b = pinAbsPos(p2.type, p2.x, p2.y, c.to.pin);
     if (!a || !b) return null;
-    const mx = (a.x + b.x) / 2;
-    const my = (a.y + b.y) / 2;
-    return `M ${a.x} ${a.y} Q ${mx} ${my - 24} ${b.x} ${b.y}`;
+    return waypointPath(a, b, c.waypoints ?? []);
   };
 
   const wiringPreview = (() => {
@@ -426,21 +467,35 @@ export default function CircuitCanvas() {
       <rect x={0} y={0} width="100%" height="100%" fill="url(#grid)" />
       <g transform={`translate(${view.tx},${view.ty}) scale(${view.scale})`}>
         {diagram.connections.map((c, i) => {
-          const d = wirePath(c.from, c.to);
+          const d = wirePath(c);
           if (!d) return null;
           const isSel = selectedWire === i;
+          const stroke = isSel ? "#ffd54f" : connectionColor(diagram, c);
           return (
             <path
               key={`w${i}`}
               data-wire={i}
               d={d}
               fill="none"
-              stroke={isSel ? "#ffd54f" : c.color ?? "#69f0ae"}
+              stroke={stroke}
               strokeWidth={isSel ? 3 : 2}
               style={{ cursor: "pointer" }}
               onMouseDown={(e) => {
                 e.stopPropagation();
                 selectWire(i);
+              }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                // 双击线段插入拐点（照抄 velxio：投影到线段上，保持正交）
+                const p = toCanvas(e.clientX, e.clientY);
+                const part1 = diagram.parts.find((q) => q.id === c.from.part);
+                const part2 = diagram.parts.find((q) => q.id === c.to.part);
+                if (!part1 || !part2) return;
+                const a = pinAbsPos(part1.type, part1.x, part1.y, c.from.pin);
+                const b = pinAbsPos(part2.type, part2.x, part2.y, c.to.pin);
+                if (!a || !b) return;
+                const wps = insertWaypointAt(c.waypoints ?? [], a, b, p.x, p.y);
+                updateConnectionWaypoints(i, wps);
               }}
             />
           );

@@ -1,12 +1,14 @@
 /** 电路域：图纸数据、网表、元件外观、选中与连线状态 */
 
-import { CATALOG } from "../circuit/catalog";
+import { CATALOG, pinAbsPos } from "../circuit/catalog";
 import { computeVisuals, type BehaviorInput, type PartVisual } from "../circuit/behavior";
 import { parseDiagram, serializeDiagram } from "../circuit/diagram";
 import { buildNetlist, type Netlist } from "../circuit/netlist";
+import { autoRoute, connectionColor } from "../circuit/wire";
 import {
   emptyDiagram,
   pinKey,
+  type Connection,
   type Diagram,
   type PartType,
   type PinRef,
@@ -234,10 +236,29 @@ export function clickPin(ref: PinRef): void {
     circuitStore.set({ wiringFrom: null });
     return;
   }
+  // 自动生成正交初始路径（绕开其他元件包围盒），并让连线按信号类型着色
+  const diagram = state.diagram;
+  const pFrom = diagram.parts.find((p) => p.id === from.part);
+  const pTo = diagram.parts.find((p) => p.id === ref.part);
+  const a = pFrom ? pinAbsPos(pFrom.type, pFrom.x, pFrom.y, from.pin) : null;
+  const b = pTo ? pinAbsPos(pTo.type, pTo.x, pTo.y, ref.pin) : null;
+  const obstacles = diagram.parts
+    .filter((p) => p.id !== from.part && p.id !== ref.part)
+    .map((p) => {
+      const def = CATALOG[p.type];
+      return { x: p.x, y: p.y, w: def.w, h: def.h };
+    });
+  const conn: Connection = { from, to: ref };
+  if (a && b) {
+    const wps = autoRoute(a, b, obstacles);
+    if (wps.length > 0) conn.waypoints = wps;
+  }
+  const color = connectionColor(diagram, conn);
+  conn.color = color;
   circuitStore.set((prev) => ({
     diagram: {
       ...prev.diagram,
-      connections: [...prev.diagram.connections, { from, to: ref, color: "green" }],
+      connections: [...prev.diagram.connections, conn],
     },
     wiringFrom: null,
   }));
@@ -256,6 +277,22 @@ export function removeConnectionAt(index: number): void {
       connections: prev.diagram.connections.filter((_, i) => i !== index),
     },
     selectedWire: null,
+  }));
+  recompute();
+}
+
+/** 更新一条连线的拐点（双击插入拐点 / 拖动调整） */
+export function updateConnectionWaypoints(
+  index: number,
+  waypoints: Array<{ x: number; y: number }>,
+): void {
+  circuitStore.set((prev) => ({
+    diagram: {
+      ...prev.diagram,
+      connections: prev.diagram.connections.map((c, i) =>
+        i === index ? { ...c, waypoints } : c,
+      ),
+    },
   }));
   recompute();
 }

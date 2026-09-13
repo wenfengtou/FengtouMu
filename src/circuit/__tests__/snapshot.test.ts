@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { buildNetlist } from "../netlist";
 import type { Diagram } from "../types";
 
-/** 标准教学电路：LED 接 GPIO2/GND；按键接 GPIO0/GND；电阻串在 GPIO2 与 LED 之间 */
+/** 标准教学电路：LED 接 D2/GND；按键接 D0/GND；电阻串在 D2 与 LED 之间 */
 const DIAGRAM: Diagram = {
   version: 1,
   parts: [
@@ -19,10 +19,10 @@ const DIAGRAM: Diagram = {
     { id: "sw1", type: "pushbutton", x: 380, y: 300 },
   ],
   connections: [
-    { from: { part: "esp", pin: "GPIO2" }, to: { part: "r1", pin: "a" }, color: "green" },
+    { from: { part: "esp", pin: "D2" }, to: { part: "r1", pin: "a" }, color: "green" },
     { from: { part: "r1", pin: "b" }, to: { part: "led1", pin: "A" }, color: "green" },
     { from: { part: "led1", pin: "C" }, to: { part: "esp", pin: "GND.1" }, color: "green" },
-    { from: { part: "esp", pin: "GPIO0" }, to: { part: "sw1", pin: "A" }, color: "green" },
+    { from: { part: "esp", pin: "D0" }, to: { part: "sw1", pin: "A" }, color: "green" },
     { from: { part: "sw1", pin: "B" }, to: { part: "esp", pin: "GND.2" }, color: "green" },
   ],
 };

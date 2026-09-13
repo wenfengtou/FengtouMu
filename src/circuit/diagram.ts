@@ -6,7 +6,7 @@
  * 导入时会做兼容映射（元件类型别名、引脚别名），并给出可读的错误说明。
  */
 
-import { CATALOG } from "./catalog";
+import { CATALOG, GPIO_TO_WOKWI } from "./catalog";
 import {
   emptyDiagram,
   pinKey,
@@ -58,6 +58,11 @@ const PIN_ALIASES: Record<PartType, Record<string, string>> = {
   potentiometer: { "1": "VCC", "2": "SIG", "3": "GND" },
 };
 
+/** 旧版 GPIO 名（GPIO2）→ Wokwi 名（D2）：兼容旧工程文件与自动化脚本 */
+const GPIO_LEGACY_ALIASES: Record<string, string> = Object.fromEntries(
+  Object.entries(GPIO_TO_WOKWI).map(([gpio, name]) => [`GPIO${gpio}`, name]),
+);
+
 /** Wokwi 拨动开关的开关位置（嵌套 attrs.switch.position）与内部 closed 互转 */
 function switchClosedFromRaw(attrsRaw: Record<string, unknown>): 0 | 1 {
   const nested = attrsRaw.switch;
@@ -88,7 +93,7 @@ export function serializeDiagram(diagram: Diagram): string {
     pinKey(c.from),
     pinKey(c.to),
     c.color ?? "green",
-    [],
+    c.waypoints?.map((w) => [w.x, w.y]) ?? [],
   ]);
   return JSON.stringify({ version: 1, parts, connections, dependencies: {} }, null, 2);
 }
@@ -103,7 +108,13 @@ function asRecord(v: unknown): Record<string, unknown> | null {
 }
 
 function normalizePinAlias(type: PartType, pin: string): string {
-  return PIN_ALIASES[type][pin] ?? pin;
+  const alias = PIN_ALIASES[type][pin];
+  if (alias) return alias;
+  // 底板：旧 GPIO 名 → Wokwi 名
+  if (type === "board-devkitc" && GPIO_LEGACY_ALIASES[pin]) {
+    return GPIO_LEGACY_ALIASES[pin];
+  }
+  return pin;
 }
 
 function hasPin(type: PartType, pin: string): boolean {
@@ -204,7 +215,16 @@ export function parseDiagram(text: string): ParseResult {
       return;
     }
     const color = typeof raw[2] === "string" && raw[2].length > 0 ? raw[2] : "green";
-    connections.push({ from, to, color });
+    // Wokwi 格式第 4 项为拐点数组 [[x,y],...]
+    const waypoints: Array<{ x: number; y: number }> = [];
+    if (Array.isArray(raw[3])) {
+      for (const wp of raw[3]) {
+        if (Array.isArray(wp) && wp.length >= 2) {
+          waypoints.push({ x: Number(wp[0]), y: Number(wp[1]) });
+        }
+      }
+    }
+    connections.push({ from, to, color, waypoints: waypoints.length > 0 ? waypoints : undefined });
   });
 
   return { diagram: { version: 1, parts, connections }, errors };

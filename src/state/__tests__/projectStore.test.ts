@@ -19,7 +19,7 @@ const DIAGRAM = JSON.stringify({
   ],
   // Wokwi 的连线是数组形式：[起点, 终点, 颜色, []]
   connections: [
-    ["led1:A", "esp:GPIO2", "green", []],
+    ["led1:A", "esp:D2", "green", []],
     ["led1:C", "esp:GND.1", "green", []],
   ],
 });
@@ -57,7 +57,7 @@ describe("applyProject + snapshot", () => {
     expect(editorStore.get().flashPath).toBe(p.flashPath);
     expect(circuitStore.get().diagram.parts.map((x) => x.id)).toEqual(["esp", "led1"]);
     expect(circuitStore.get().diagram.connections).toHaveLength(2);
-    // 网表应已重建：led1 的 A 脚在 GPIO2 所在的网络上
+    // 网表应已重建：led1 的 A 脚在 D2 所在的网络上
     expect(circuitStore.get().netlist.nets.length).toBeGreaterThan(0);
   });
 
@@ -91,7 +91,7 @@ describe("applyProject + snapshot", () => {
         { type: "board-esp32-devkitc", id: "esp", top: 0, left: 0, attrs: {} },
         { type: "wokwi-led", id: "led1", top: 0, left: 0, attrs: {} },
       ],
-      connections: [["led1:ZZZ", "esp:GPIO2", "green", []]],
+      connections: [["led1:ZZZ", "esp:D2", "green", []]],
     });
     const errors = applyProject({ ...sampleProject(), diagram: bad });
     expect(errors.length).toBeGreaterThan(0);

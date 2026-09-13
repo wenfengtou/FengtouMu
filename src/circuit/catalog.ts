@@ -19,6 +19,8 @@ export interface PartPinDef {
   boardPin?: number;
   /** GPIO 号，仅 GPIO 引脚有 */
   gpio?: number;
+  /** 信号类型（连线着色用） */
+  signal?: SignalType;
 }
 
 export interface PartDef {
@@ -40,14 +42,116 @@ export const DEVKITC_PINMAP: number[] = [
   7, 8, 15, 2, 0, 4, 16, 17, 5, 18, 19, -1, 21, 3, 1, 22, 23, -1,
 ];
 
+/**
+ * GPIO 号 → Wokwi 官方 esp32-devkit-v1 引脚名。
+ * 命名对齐 wokwi-elements（D 数字 前缀，功能脚用 VP/VN/RX0/TX0/RX2/TX2）。
+ * 官方元件没有的 GPIO（0/6/7/8/9/10/11）按 Wokwi 风格补 D0/D6…/D11。
+ */
+export const GPIO_TO_WOKWI: Record<number, string> = {
+  0: "D0",
+  1: "TX0",
+  2: "D2",
+  3: "RX0",
+  4: "D4",
+  5: "D5",
+  6: "D6",
+  7: "D7",
+  8: "D8",
+  9: "D9",
+  10: "D10",
+  11: "D11",
+  12: "D12",
+  13: "D13",
+  14: "D14",
+  15: "D15",
+  16: "RX2",
+  17: "TX2",
+  18: "D18",
+  19: "D19",
+  21: "D21",
+  22: "D22",
+  23: "D23",
+  25: "D25",
+  26: "D26",
+  27: "D27",
+  32: "D32",
+  33: "D33",
+  34: "D34",
+  35: "D35",
+  36: "VP",
+  39: "VN",
+};
+
+/** GPIO 号 → 信号类型（对齐 Wokwi pinInfo 的 signals，用于连线着色） */
+export const GPIO_SIGNAL: Record<number, SignalType> = {
+  // UART：RX0/TX0 = GPIO3/1，RX2/TX2 = GPIO16/17
+  1: "usart",
+  3: "usart",
+  16: "usart",
+  17: "usart",
+  // I2C：SDA=D21，SCL=D22
+  21: "i2c",
+  22: "i2c",
+  // SPI：SCK=D18，MISO=D19，MOSI=D23，SS=D5
+  5: "spi",
+  18: "spi",
+  19: "spi",
+  23: "spi",
+  // ADC：D34/D35/VP(36)/VN(39) 可作模拟输入
+  34: "analog",
+  35: "analog",
+  36: "analog",
+  39: "analog",
+};
+
+/** 连线信号类型（对齐 velxio WireSignalType） */
+export type SignalType =
+  | "power-vcc"
+  | "power-gnd"
+  | "analog"
+  | "digital"
+  | "pwm"
+  | "i2c"
+  | "spi"
+  | "usart";
+
+/** 信号类型 → 连线颜色（逐字照抄 velxio wireColors.ts 的 Wokwi 色彩规范） */
+export const WIRE_COLORS: Record<SignalType, string> = {
+  "power-vcc": "#ff0000", // Red - Power positive
+  "power-gnd": "#000000", // Black - Ground
+  analog: "#4169e1", // Royal Blue - Analog signals
+  digital: "#00ff00", // Green - Digital signals
+  pwm: "#8b5cf6", // Purple - PWM signals
+  i2c: "#ffd700", // Gold/Yellow - I2C bus
+  spi: "#ff8c00", // Orange - SPI bus
+  usart: "#00ced1", // Cyan - Serial UART
+};
+
+/** 信号优先级（照抄 velxio determineSignalType：power > 协议 > PWM > 模拟 > 数字） */
+const SIGNAL_PRIORITY: Record<SignalType, number> = {
+  "power-vcc": 7,
+  "power-gnd": 7,
+  i2c: 6,
+  spi: 6,
+  usart: 6,
+  pwm: 4,
+  analog: 3,
+  digital: 1,
+};
+
+/** 取两个信号类型中优先级更高的（用于连线两端合并） */
+export function mergeSignal(a: SignalType, b: SignalType): SignalType {
+  return SIGNAL_PRIORITY[a] >= SIGNAL_PRIORITY[b] ? a : b;
+}
+
 /** 非 GPIO 板级引脚的名称与类别 */
-const BOARD_SPECIAL: Record<number, { id: string; label: string; kind: PartPinDef["kind"] }> = {
-  1: { id: "3V3", label: "3V3", kind: "vcc" },
-  2: { id: "EN", label: "EN", kind: "other" },
-  14: { id: "GND.1", label: "GND", kind: "gnd" },
-  19: { id: "VIN", label: "VIN", kind: "vcc" },
-  32: { id: "GND.2", label: "GND", kind: "gnd" },
-  38: { id: "GND.3", label: "GND", kind: "gnd" },
+const BOARD_SPECIAL: Record<number, { id: string; label: string; kind: PartPinDef["kind"]; signal: SignalType }> = {
+  1: { id: "3V3", label: "3V3", kind: "vcc", signal: "power-vcc" },
+  2: { id: "EN", label: "EN", kind: "other", signal: "digital" },
+  14: { id: "GND.1", label: "GND", kind: "gnd", signal: "power-gnd" },
+  19: { id: "VIN", label: "VIN", kind: "vcc", signal: "power-vcc" },
+  32: { id: "GND.2", label: "GND", kind: "gnd", signal: "power-gnd" },
+  38: { id: "GND.3", label: "GND", kind: "gnd", signal: "power-gnd" },
 };
 
 const BOARD_W = 210;
@@ -71,14 +175,16 @@ function buildBoardPins(): PartPinDef[] {
     const pos = boardPinPos(n);
     const special = BOARD_SPECIAL[n];
     if (gpio >= 0) {
+      const wokwiName = GPIO_TO_WOKWI[gpio] ?? `GPIO${gpio}`;
       pins.push({
-        id: `GPIO${gpio}`,
-        label: `GPIO${gpio}`,
+        id: wokwiName,
+        label: wokwiName,
         x: pos.x,
         y: pos.y,
         kind: "gpio",
         boardPin: n,
         gpio,
+        signal: GPIO_SIGNAL[gpio] ?? "digital",
       });
     } else if (special) {
       pins.push({
@@ -88,6 +194,7 @@ function buildBoardPins(): PartPinDef[] {
         y: pos.y,
         kind: special.kind,
         boardPin: n,
+        signal: special.signal,
       });
     }
   }

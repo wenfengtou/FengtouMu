@@ -33,6 +33,8 @@ export interface Connection {
   from: PinRef;
   to: PinRef;
   color?: string;
+  /** 中间拐点（照抄 velxio waypoints：双击线段插入、拖动调整、自动布线生成） */
+  waypoints?: Array<{ x: number; y: number }>;
 }
 
 export interface Diagram {

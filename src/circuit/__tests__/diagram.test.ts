@@ -10,7 +10,7 @@ const sample: Diagram = {
     { id: "r1", type: "resistor", x: 300, y: 160, attrs: { value: "220" } },
   ],
   connections: [
-    { from: { part: "esp", pin: "GPIO2" }, to: { part: "r1", pin: "a" }, color: "green" },
+    { from: { part: "esp", pin: "D2" }, to: { part: "r1", pin: "a" }, color: "green" },
     { from: { part: "r1", pin: "b" }, to: { part: "led1", pin: "A" } },
     { from: { part: "led1", pin: "C" }, to: { part: "esp", pin: "GND.1" } },
   ],
@@ -35,7 +35,7 @@ describe("diagram.json 读写", () => {
     const parts = raw.parts as Array<Record<string, unknown>>;
     expect(parts[1]).toMatchObject({ type: "wokwi-led", id: "led1", left: 300, top: 80 });
     const conns = raw.connections as unknown[][];
-    expect(conns[0][0]).toBe("esp:GPIO2");
+    expect(conns[0][0]).toBe("esp:D2");
     expect(conns[0][1]).toBe("r1:a");
   });
 
@@ -81,7 +81,7 @@ describe("diagram.json 读写", () => {
     const text = JSON.stringify({
       version: 1,
       parts: [{ type: "wokwi-led", id: "led1", left: 0, top: 0 }],
-      connections: [["esp:GPIO2", "led1:XYZ", "green", []]],
+      connections: [["esp:D2", "led1:XYZ", "green", []]],
     });
     const { diagram, errors } = parseDiagram(text);
     expect(errors.some((e) => e.includes("引脚名无效"))).toBe(true);
@@ -97,9 +97,9 @@ describe("diagram.json 读写", () => {
         { type: "wokwi-potentiometer", id: "pot1", left: 0, top: 0 },
       ],
       connections: [
-        ["esp:GPIO2", "r1:1", "green", []],
+        ["esp:D2", "r1:1", "green", []],
         ["r1:2", "sw1:1.l", "green", []],
-        ["pot1:2", "esp:GPIO34", "green", []],
+        ["pot1:2", "esp:D34", "green", []],
         ["pot1:1", "esp:3V3", "red", []],
         ["pot1:3", "esp:GND.1", "black", []],
       ],
@@ -107,9 +107,9 @@ describe("diagram.json 读写", () => {
     const { diagram, errors } = parseDiagram(text);
     expect(errors).toEqual([]);
     expect(diagram.connections.map((c) => `${c.from.pin}->${c.to.pin}`)).toEqual([
-      "GPIO2->a",
+      "D2->a",
       "b->A",
-      "SIG->GPIO34",
+      "SIG->D34",
       "VCC->3V3",
       "GND->GND.1",
     ]);
@@ -124,7 +124,7 @@ describe("diagram.json 读写", () => {
     const broken: Diagram = {
       version: 1,
       parts: [{ id: "esp", type: "board-devkitc", x: 0, y: 0 }],
-      connections: [{ from: { part: "esp", pin: "GPIO2" }, to: { part: "led1", pin: "A" } }],
+      connections: [{ from: { part: "esp", pin: "D2" }, to: { part: "led1", pin: "A" } }],
     };
     const issues = validateDiagram(broken);
     expect(issues.some((i) => i.includes("终点元件不存在"))).toBe(true);
@@ -139,7 +139,7 @@ describe("diagram.json 读写", () => {
         { id: "bz1", type: "buzzer", x: 300, y: 160 },
       ],
       connections: [
-        { from: { part: "esp", pin: "GPIO2" }, to: { part: "tgl1", pin: "1" } },
+        { from: { part: "esp", pin: "D2" }, to: { part: "tgl1", pin: "1" } },
         { from: { part: "tgl1", pin: "2" }, to: { part: "bz1", pin: "1" } },
       ],
     };
@@ -162,7 +162,7 @@ describe("diagram.json 读写", () => {
     const text = JSON.stringify({
       version: 1,
       parts: [{ type: "wokwi-slide-switch", id: "tgl1", left: 10, top: 10, attrs: { switch: { position: 1 } } }],
-      connections: [["tgl1:1", "esp:GPIO2", "green", []]],
+      connections: [["tgl1:1", "esp:D2", "green", []]],
     });
     const { diagram, errors } = parseDiagram(text);
     expect(errors).toEqual([]);

@@ -3,9 +3,9 @@
 // 用法：node scripts/ui_drive.mjs
 // 覆盖三条链路：
 //   A 板卡视图：运行 → 板载 LED 闪烁 → 停止
-//   B 电路图：放置 LED → 连线 GPIO2/GND → 运行 → 画布上的 LED 闪烁 → 停止
-//   C 电路图 + 按键：放置按键 → 连线 GPIO0/GND → 运行 → 按住 → 界面按键状态更新 → 停止
-//   D 电路图 + 电位器：放置电位器 → SIG 接 GPIO34 → 运行 → 拖动旋钮 → 读数改变且注入无报错 → 停止
+//   B 电路图：放置 LED → 连线 D2/GND → 运行 → 画布上的 LED 闪烁 → 停止
+//   C 电路图 + 按键：放置按键 → 连线 D0/GND → 运行 → 按住 → 界面按键状态更新 → 停止
+//   D 电路图 + 电位器：放置电位器 → SIG 接 D34 → 运行 → 拖动旋钮 → 读数改变且注入无报错 → 停止
 //   E 自动保存恢复：预置 autosave.vlx → 点「恢复上次编辑」→ 内容与工程名被整份灌回
 //   H 一键编译：点「编译」→ arduino-cli 产出合并镜像、固件路径切到 *.ino.merged.bin
 //   F 工程工具条：点「新建」→ 电路图与导线清空、标题回到未命名工程
@@ -66,7 +66,7 @@ function seedAutosave() {
       { type: "wokwi-led", id: "led1", top: 240, left: 460, attrs: { color: "red" } },
     ],
     connections: [
-      ["led1:A", "esp:GPIO2", "green", []],
+      ["led1:A", "esp:D2", "green", []],
       ["led1:C", "esp:GND.1", "green", []],
     ],
   });
@@ -378,7 +378,7 @@ async function stageCircuitLed() {
   await addPartViaPicker('led');
   const wires0 = (await ui()).wires;
   await clickSel('[data-pin="led1:A"]');
-  await clickSel('[data-pin="esp:GPIO2"]');
+  await clickSel('[data-pin="esp:D2"]');
   await clickSel('[data-pin="led1:C"]');
   await clickSel('[data-pin="esp:GND.1"]');
   const wires1 = (await ui()).wires;
@@ -420,7 +420,7 @@ async function stageCircuitButton() {
   await ensureStopped();
   await addPartViaPicker('pushbutton');
   await clickSel('[data-pin="sw1:A"]');
-  await clickSel('[data-pin="esp:GPIO0"]');
+  await clickSel('[data-pin="esp:D0"]');
   await clickSel('[data-pin="sw1:B"]');
   await clickSel('[data-pin="esp:GND.1"]');
   const p0 = await ui();
@@ -459,14 +459,14 @@ async function stageCircuitButton() {
   return { ok: true };
 }
 
-/** D. 电路图 + 电位器：SIG→GPIO34，拖动旋钮应改变外观并经 cmd_set_apin 注入且不报错 */
+/** D. 电路图 + 电位器：SIG→D34，拖动旋钮应改变外观并经 cmd_set_apin 注入且不报错 */
 async function stageCircuitPot() {
   await openTab("电路图");
   await ensureStopped();
   await addPartViaPicker('potentiometer');
   const wires0 = (await ui()).wires;
   await clickSel('[data-pin="pot1:SIG"]');
-  await clickSel('[data-pin="esp:GPIO34"]');
+  await clickSel('[data-pin="esp:D34"]');
   await clickSel('[data-pin="pot1:VCC"]');
   await clickSel('[data-pin="esp:3V3"]');
   await clickSel('[data-pin="pot1:GND"]');
@@ -648,7 +648,7 @@ async function stageCircuitSwitch() {
   await addPartViaPicker('switch');
   const wires0 = (await ui()).wires;
   await clickSel('[data-pin="tgl1:1"]');
-  await clickSel('[data-pin="esp:GPIO0"]');
+  await clickSel('[data-pin="esp:D0"]');
   await clickSel('[data-pin="tgl1:2"]');
   await clickSel('[data-pin="esp:GND.1"]');
   const p0 = await ui();

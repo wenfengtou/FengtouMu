@@ -42,7 +42,7 @@ describe("LED 外观", () => {
   it("正极接高电平 GPIO、负极接地时点亮", () => {
     const ctx = input(
       [
-        { from: { part: "esp", pin: "GPIO2" }, to: { part: "led1", pin: "A" } },
+        { from: { part: "esp", pin: "D2" }, to: { part: "led1", pin: "A" } },
         { from: { part: "led1", pin: "C" }, to: { part: "esp", pin: "GND.1" } },
       ],
       [board, { id: "led1", type: "led", x: 0, y: 0 }],
@@ -55,7 +55,7 @@ describe("LED 外观", () => {
   it("GPIO 为低电平时不亮", () => {
     const ctx = input(
       [
-        { from: { part: "esp", pin: "GPIO2" }, to: { part: "led1", pin: "A" } },
+        { from: { part: "esp", pin: "D2" }, to: { part: "led1", pin: "A" } },
         { from: { part: "led1", pin: "C" }, to: { part: "esp", pin: "GND.1" } },
       ],
       [board, { id: "led1", type: "led", x: 0, y: 0 }],
@@ -75,11 +75,11 @@ describe("LED 外观", () => {
 describe("按键注入", () => {
   const parts = [board, { id: "sw1", type: "pushbutton" as const, x: 0, y: 0 }];
   const conns: Diagram["connections"] = [
-    { from: { part: "sw1", pin: "A" }, to: { part: "esp", pin: "GPIO0" } },
+    { from: { part: "sw1", pin: "A" }, to: { part: "esp", pin: "D0" } },
     { from: { part: "sw1", pin: "B" }, to: { part: "esp", pin: "GND.1" } },
   ];
 
-  it("按下时把 GPIO0 拉低，松开时恢复高电平", () => {
+  it("按下时把 D0 拉低，松开时恢复高电平", () => {
     const ctx = input(conns, parts, new Map());
     expect(buttonInjection(ctx, "sw1", true)).toEqual({
       boardPin: BOARD_PIN_GPIO0,
@@ -107,7 +107,7 @@ describe("蜂鸣器外观", () => {
   it("一端接高电平 GPIO、另一端接地时鸣响", () => {
     const ctx = input(
       [
-        { from: { part: "esp", pin: "GPIO2" }, to: { part: "bz1", pin: "1" } },
+        { from: { part: "esp", pin: "D2" }, to: { part: "bz1", pin: "1" } },
         { from: { part: "bz1", pin: "2" }, to: { part: "esp", pin: "GND.1" } },
       ],
       [board, { id: "bz1", type: "buzzer", x: 0, y: 0 }],
@@ -120,7 +120,7 @@ describe("蜂鸣器外观", () => {
   it("GPIO 为低电平时不鸣响", () => {
     const ctx = input(
       [
-        { from: { part: "esp", pin: "GPIO2" }, to: { part: "bz1", pin: "1" } },
+        { from: { part: "esp", pin: "D2" }, to: { part: "bz1", pin: "1" } },
         { from: { part: "bz1", pin: "2" }, to: { part: "esp", pin: "GND.1" } },
       ],
       [board, { id: "bz1", type: "buzzer", x: 0, y: 0 }],
@@ -143,7 +143,7 @@ describe("拨动开关", () => {
 
   const parts = [board, { id: "tgl1", type: "switch" as const, x: 0, y: 0 }];
   const conns: Diagram["connections"] = [
-    { from: { part: "tgl1", pin: "1" }, to: { part: "esp", pin: "GPIO0" } },
+    { from: { part: "tgl1", pin: "1" }, to: { part: "esp", pin: "D0" } },
     { from: { part: "tgl1", pin: "2" }, to: { part: "esp", pin: "GND.1" } },
   ];
 
@@ -163,7 +163,7 @@ describe("拨动开关", () => {
 
   it("开关接 VCC 侧：闭合与断开都读高", () => {
     const vccConns: Diagram["connections"] = [
-      { from: { part: "tgl1", pin: "1" }, to: { part: "esp", pin: "GPIO0" } },
+      { from: { part: "tgl1", pin: "1" }, to: { part: "esp", pin: "D0" } },
       { from: { part: "tgl1", pin: "2" }, to: { part: "esp", pin: "3V3" } },
     ];
     const ctx = input(vccConns, parts, new Map());
@@ -187,10 +187,10 @@ describe("电位器注入", () => {
     { id: "pot1", type: "potentiometer" as const, x: 0, y: 0, attrs: { value: 50 } },
   ];
   const conns: Diagram["connections"] = [
-    { from: { part: "pot1", pin: "SIG" }, to: { part: "esp", pin: "GPIO34" } },
+    { from: { part: "pot1", pin: "SIG" }, to: { part: "esp", pin: "D34" } },
   ];
 
-  it("按 GPIO34 的 SAR 通道注入 12 位读数", () => {
+  it("按 D34 的 SAR 通道注入 12 位读数", () => {
     const ctx = input(conns, parts, new Map());
     const inj = potInjection(ctx, "pot1", 0.5);
     expect(inj).toEqual({ channel: adcChannelOfGpio(34), raw: Math.round(0.5 * ADC_MAX), gpio: 34 });

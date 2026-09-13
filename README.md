@@ -8,8 +8,8 @@
 
 - **代码编辑**：Monaco 编辑器，Arduino 语法高亮，内置 LED 闪烁示例
 - **一键编译**：封装 arduino-cli，编译前自动把编辑器内容同步到草图目录的 `.ino`（首次覆盖自动备份为 `.bak`），产出 QEMU 可用的 4MB 合并镜像（DIO / 40MHz）
-- **本地仿真**：ESP32 DevKitC 板卡视图（38 引脚状态、板载 LED=GPIO2、BOOT 按键=GPIO0）、串口终端（UART0 收发）
-- **电路图编辑**：SVG 画布放置元件、拖拽、连线，元件含 LED、电阻、按键、电位器；图纸以 Wokwi 兼容的 `diagram.json` 导入导出
+- **本地仿真**：ESP32 DevKitC 板卡视图（38 引脚状态、板载 LED=D2/GPIO2、BOOT 按键=D0/GPIO0）、串口终端（UART0 收发）
+- **电路图编辑**：SVG 画布放置元件、拖拽、连线，引脚命名对齐 Wokwi（D2/VP/VN/RX0…），连线自动布正交拐点、按信号类型着色（VCC 红/GND 黑/模拟蓝/数字绿/I2C 金/SPI 橙/UART 青），双击线段可插拐点；图纸以 Wokwi 兼容的 `diagram.json` 导入导出
 - **工程文件**：`.vlx` 自包含工程（源码文件 + 电路图全部内嵌，拷到任何电脑都能还原；兼容读取 velxio/circuit-muse 的 `.vlx`）可新建 / 打开 / 另存为，本地项目库 2 秒防抖自动保存（异常退出可恢复）；支持导入导出 Wokwi 兼容 zip
 - **环境自检**：一键清点 QEMU 动态库及依赖、固件目录、仿真子进程、arduino-cli、ESP32 核心、固件镜像、应用数据目录，缺什么就给出可执行的下一步
 - **持续集成**：GitHub Actions 在 Windows 上跑前端构建 + 前端单元测试 + Rust 无 GUI 测试
