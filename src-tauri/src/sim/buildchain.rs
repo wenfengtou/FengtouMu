@@ -14,6 +14,15 @@ pub struct CompileResult {
     pub backup: Option<String>,
 }
 
+/// Windows 下给子进程加 CREATE_NO_WINDOW，避免编译时弹出黑色控制台窗口。
+#[cfg(windows)]
+fn no_console(cmd: &mut std::process::Command) {
+    use std::os::windows::process::CommandExt;
+    cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+}
+#[cfg(not(windows))]
+fn no_console(_cmd: &mut std::process::Command) {}
+
 /// 在用户配置中查找 arduino-cli（环境变量 ARDUINO_CLI > 常见安装位置）。
 pub fn find_arduino_cli() -> Option<PathBuf> {
     if let Ok(p) = std::env::var("ARDUINO_CLI") {
@@ -32,7 +41,10 @@ pub fn find_arduino_cli() -> Option<PathBuf> {
         }
     }
     // PATH 兜底
-    if let Ok(output) = std::process::Command::new("arduino-cli").arg("version").output() {
+    let mut ver_cmd = std::process::Command::new("arduino-cli");
+    ver_cmd.arg("version");
+    no_console(&mut ver_cmd);
+    if let Ok(output) = ver_cmd.output() {
         if output.status.success() {
             return Some(PathBuf::from("arduino-cli"));
         }
@@ -214,13 +226,15 @@ pub fn compile(
 
     std::fs::create_dir_all(output_dir).map_err(|e| format!("创建输出目录失败: {e}"))?;
 
-    let output = std::process::Command::new(&cli)
-        .arg("compile")
+    let mut cmd = std::process::Command::new(&cli);
+    cmd.arg("compile")
         .arg("--fqbn")
         .arg(fqbn)
         .arg("--output-dir")
         .arg(output_dir)
-        .arg(sketch_dir)
+        .arg(sketch_dir);
+    no_console(&mut cmd);
+    let output = cmd
         .output()
         .map_err(|e| format!("调用 arduino-cli 失败: {e}"))?;
 

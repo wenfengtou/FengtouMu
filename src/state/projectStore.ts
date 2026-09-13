@@ -287,6 +287,16 @@ export async function saveProjectAs(): Promise<void> {
   }
 }
 
+/** 从最近工程列表移除记录（不删除磁盘文件），并持久化 */
+export async function removeRecent(path: string): Promise<void> {
+  const st = projectStore.get();
+  if (!st.recent.some((e) => e.path === path)) return;
+  const recent = st.recent.filter((e) => e.path !== path);
+  projectStore.set({ recent });
+  await persistPrefs();
+  setMsg("已从最近工程列表移除");
+}
+
 /** 恢复上次退出时残留的自动保存内容 */
 export async function restoreSession(): Promise<void> {
   const session = projectStore.get().session;
