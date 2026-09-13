@@ -19,6 +19,7 @@ import BoardView from "./components/BoardView";
 import CircuitPanel from "./components/CircuitPanel";
 import CodeEditor from "./components/CodeEditor";
 import CompilationConsole from "./components/CompilationConsole";
+import ComponentPicker from "./components/ComponentPicker";
 import DiagramView from "./components/DiagramView";
 import EditorToolbar from "./components/EditorToolbar";
 import EnvPanel from "./components/EnvPanel";
@@ -43,7 +44,7 @@ import { initSim, simStore, writePin } from "./state/simStore";
 import { useStore } from "./state/store";
 import {
   setMsg,
-  setPaletteOpen,
+  setPickerOpen,
   setSerialOpen,
   setView,
   setViewMode,
@@ -59,6 +60,7 @@ import "./cm/tabs.css";
 import "./cm/explorer.css";
 import "./cm/canvas.css";
 import "./cm/palette.css";
+import "./cm/picker.css";
 
 const BOTTOM_MIN = 80;
 const BOTTOM_MAX = 600;
@@ -92,7 +94,6 @@ function App() {
   const explorerOpen = useStore(uiStore, (s) => s.explorerOpen);
   const consoleOpen = useStore(uiStore, (s) => s.consoleOpen);
   const serialOpen = useStore(uiStore, (s) => s.serialOpen);
-  const paletteOpen = useStore(uiStore, (s) => s.paletteOpen);
   const activeFileId = useStore(uiStore, (s) => s.activeFileId);
   const partCount = useStore(circuitStore, (s) => s.diagram.parts.length);
   const wireCount = useStore(circuitStore, (s) => s.diagram.connections.length);
@@ -349,7 +350,7 @@ function App() {
                   </svg>
                 </button>
               </div>
-              <button className="add-component-btn" onClick={() => setPaletteOpen(!paletteOpen)} title="Add Component" disabled={view !== "circuit"}>
+              <button className="add-component-btn" onClick={() => { setView("circuit"); setPickerOpen(true); }} title="Add Component">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                   <line x1="12" y1="5" x2="12" y2="19" />
                   <line x1="5" y1="12" x2="19" y2="12" />
@@ -440,6 +441,7 @@ function App() {
         {msg || "就绪：加载 DLL → 编译或选择固件 → 运行仿真"}
       </div>
 
+      <ComponentPicker />
       <EnvPanel />
     </div>
   );

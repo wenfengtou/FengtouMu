@@ -1,9 +1,19 @@
 /** 统一工具条（CircuitMuse 风格）：编译/运行/停止/复位 + 文件标签 + 溢出菜单 + 输出控制台 */
 
 import { useEffect, useRef, useState } from "react";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { STATUS_TEXT } from "../config";
+import {
+  circuitStore,
+  importDiagramText,
+  removeConnectionAt,
+  removePart,
+  resetCircuit,
+  exportDiagramText,
+} from "../state/circuitStore";
 import { compileCurrent, editorStore, pickFlashFile, pickFwDir, pickSketchDir } from "../state/editorStore";
 import { setEnvPanelOpen } from "../state/envStore";
+import { readTextFile, writeTextFile } from "../lib/api";
 import {
   exportWokwiProject,
   importWokwiProject,
@@ -25,6 +35,8 @@ export default function EditorToolbar() {
   const flashPath = useStore(editorStore, (s) => s.flashPath);
   const fqbn = useStore(projectStore, (s) => s.fqbn);
   const session = useStore(projectStore, (s) => s.session);
+  const selected = useStore(circuitStore, (s) => s.selected);
+  const selectedWire = useStore(circuitStore, (s) => s.selectedWire);
 
   const running = status === "running" || status === "loading" || status === "stopping";
   const [moreOpen, setMoreOpen] = useState(false);
@@ -45,13 +57,45 @@ export default function EditorToolbar() {
     });
   };
 
+  const onImportDiagram = async () => {
+    const file = await open({
+      title: "Import diagram.json",
+      filters: [{ name: "Circuit diagram", extensions: ["json"] }],
+    });
+    if (typeof file !== "string") return;
+    try {
+      const text = await readTextFile(file);
+      const errors = importDiagramText(text);
+      setMsg(errors.length > 0 ? `已导入，但有 ${errors.length} 处问题：${errors.slice(0, 3).join("；")}` : `已导入 ${file}`);
+    } catch (e) {
+      setMsg(`导入失败: ${e}`);
+    }
+  };
+
+  const onExportDiagram = async () => {
+    const path = await save({
+      title: "Export diagram.json",
+      defaultPath: "diagram.json",
+      filters: [{ name: "Circuit diagram", extensions: ["json"] }],
+    });
+    if (typeof path !== "string") return;
+    try {
+      await writeTextFile(path, exportDiagramText());
+      setMsg(`已导出 ${path}`);
+    } catch (e) {
+      setMsg(`导出失败: ${e}`);
+    }
+  };
+
   const flashName = flashPath.split(/[\\/]/).pop() || "";
 
-  const menu = (label: string, action: () => void, extra?: Record<string, string>) => (
+  const menu = (label: string, action: () => void, extra?: Record<string, string>, disabled = false) => (
     <button
       key={label}
       className="tb-overflow-item"
+      disabled={disabled}
       onClick={() => {
+        if (disabled) return;
         action();
         setMoreOpen(false);
       }}
@@ -161,6 +205,29 @@ export default function EditorToolbar() {
                 {menu("Environment check", () => setEnvPanelOpen(true), { "data-action": "env-check" })}
                 {menu("Docs", () => setMsg("文档位于项目 docs/ 目录（开发日志、设计文档、QEMU DLL 编译指南）"))}
                 {menu("GitHub", () => setMsg("https://github.com/wenfengtou/FengtouMu"))}
+                <div className="tb-overflow-sep" />
+                {menu(
+                  "Delete selected part",
+                  () => {
+                    if (selected) removePart(selected);
+                  },
+                  undefined,
+                  !selected,
+                )}
+                {menu(
+                  "Delete selected wire",
+                  () => {
+                    if (selectedWire !== null) removeConnectionAt(selectedWire);
+                  },
+                  undefined,
+                  selectedWire === null,
+                )}
+                {menu("Clear circuit", () => {
+                  resetCircuit();
+                  setMsg("已清空电路图");
+                })}
+                {menu("Import diagram.json…", () => void onImportDiagram())}
+                {menu("Export diagram.json…", () => void onExportDiagram())}
               </div>
             )}
           </div>

@@ -18,9 +18,11 @@ export interface UiState {
   /** Code / Both / Circuit 三态布局 */
   viewMode: ViewMode;
   explorerOpen: boolean;
+  /** 编译输出控制台（默认打开，位于代码编辑器下方） */
   consoleOpen: boolean;
   serialOpen: boolean;
-  paletteOpen: boolean;
+  /** 元件选择器（Add 按钮弹出的模态框） */
+  pickerOpen: boolean;
   /** 当前打开的标签页：sketch.ino 或 diagram.json */
   activeFileId: string;
   compileLogs: CompileLog[];
@@ -32,9 +34,9 @@ export const uiStore = createStore<UiState>({
   view: "board",
   viewMode: "both",
   explorerOpen: true,
-  consoleOpen: false,
+  consoleOpen: true,
   serialOpen: true,
-  paletteOpen: true,
+  pickerOpen: false,
   activeFileId: "sketch",
   compileLogs: [],
 });
@@ -47,7 +49,7 @@ export const toggleExplorer = (): void =>
   uiStore.set((s) => ({ explorerOpen: !s.explorerOpen }));
 export const setConsoleOpen = (consoleOpen: boolean): void => uiStore.set({ consoleOpen });
 export const setSerialOpen = (serialOpen: boolean): void => uiStore.set({ serialOpen });
-export const setPaletteOpen = (paletteOpen: boolean): void => uiStore.set({ paletteOpen });
+export const setPickerOpen = (pickerOpen: boolean): void => uiStore.set({ pickerOpen });
 export const setActiveFile = (activeFileId: string): void => uiStore.set({ activeFileId });
 
 export function appendCompileLog(log: Omit<CompileLog, "ts">): void {

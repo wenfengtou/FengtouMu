@@ -1,18 +1,14 @@
-/** 电路图面板（CircuitMuse 风格）：左侧元件面板（可折叠）+ SVG 画布 */
+/** 电路图面板（CircuitMuse 风格）：SVG 画布 + 底部统计提示；元件经 Add 模态框添加 */
 
 import { circuitStore } from "../state/circuitStore";
 import { useStore } from "../state/store";
-import { uiStore } from "../state/uiStore";
 import CircuitCanvas from "./CircuitCanvas";
-import PartPalette from "./PartPalette";
 
 export default function CircuitPanel() {
-  const paletteOpen = useStore(uiStore, (s) => s.paletteOpen);
   const partCount = useStore(circuitStore, (s) => s.diagram.parts.length);
 
   return (
     <div className="simulator-canvas-container">
-      {paletteOpen && <PartPalette />}
       <div className="simulator-canvas">
         <div className="canvas-content" style={{ position: "relative", flex: 1 }}>
           <CircuitCanvas />
@@ -30,6 +26,7 @@ export default function CircuitPanel() {
             padding: "3px 10px",
             borderRadius: 12,
             pointerEvents: "none",
+            whiteSpace: "nowrap",
           }}
         >
           {partCount - 1} components on canvas

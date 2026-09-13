@@ -372,7 +372,7 @@ async function stageCircuitLed() {
   await ensureStopped();
   await zoomOut(8);
 
-  await clickSel('[data-part-type="led"]');
+  await addPartViaPicker('led');
   const wires0 = (await ui()).wires;
   await clickSel('[data-pin="led1:A"]');
   await clickSel('[data-pin="esp:GPIO2"]');
@@ -415,7 +415,7 @@ async function stageCircuitLed() {
 async function stageCircuitButton() {
   await openTab("电路图");
   await ensureStopped();
-  await clickSel('[data-part-type="pushbutton"]');
+  await addPartViaPicker('pushbutton');
   await clickSel('[data-pin="sw1:A"]');
   await clickSel('[data-pin="esp:GPIO0"]');
   await clickSel('[data-pin="sw1:B"]');
@@ -460,7 +460,7 @@ async function stageCircuitButton() {
 async function stageCircuitPot() {
   await openTab("电路图");
   await ensureStopped();
-  await clickSel('[data-part-type="potentiometer"]');
+  await addPartViaPicker('potentiometer');
   const wires0 = (await ui()).wires;
   await clickSel('[data-pin="pot1:SIG"]');
   await clickSel('[data-pin="esp:GPIO34"]');
@@ -593,6 +593,14 @@ async function stageRestoreSession() {
   return { ok: true };
 }
 
+/** 通过 Add → 元件选择器模态框添加元件（CircuitMuse 交互） */
+async function addPartViaPicker(type) {
+  await clickSel('.add-component-btn');
+  await sleep(500);
+  await clickSel(`[data-part-type="${type}"]`);
+  await sleep(400);
+}
+
 /** H. 一键编译：点「编译」应产出合并镜像并把固件路径指过去 */
 async function stageCompile() {
   await ensureStopped();
@@ -634,7 +642,7 @@ async function stageCompile() {
 async function stageCircuitSwitch() {
   await openTab("电路图");
   await ensureStopped();
-  await clickSel('[data-part-type="switch"]');
+  await addPartViaPicker('switch');
   const wires0 = (await ui()).wires;
   await clickSel('[data-pin="tgl1:1"]');
   await clickSel('[data-pin="esp:GPIO0"]');
