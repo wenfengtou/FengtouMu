@@ -39,6 +39,8 @@ pub fn run() {
             project::cmd_app_paths,
             project::cmd_import_wokwi_zip,
             project::cmd_export_wokwi_zip,
+            project::cmd_library_list,
+            project::cmd_library_delete,
             envcheck::cmd_env_check,
         ])
         .run(tauri::generate_context!())

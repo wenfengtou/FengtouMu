@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { AppPaths, Prefs, ProjectFile, WokwiImport } from "../project/format";
+import type { AppPaths, LibraryEntry, Prefs, ProjectFile, WokwiImport } from "../project/format";
 
 export type SimStatus = "idle" | "loading" | "running" | "stopping" | "stopped";
 
@@ -74,6 +74,8 @@ export const projectLoad = (path: string) => invoke<ProjectFile>("cmd_project_lo
 export const prefsLoad = () => invoke<Prefs>("cmd_prefs_load");
 export const prefsSave = (prefs: Prefs) => invoke<void>("cmd_prefs_save", { prefs });
 export const appPaths = () => invoke<AppPaths>("cmd_app_paths");
+export const libraryList = () => invoke<LibraryEntry[]>("cmd_library_list");
+export const libraryDelete = (id: string) => invoke<void>("cmd_library_delete", { id });
 export const importWokwiZip = (path: string, destDir: string) =>
   invoke<WokwiImport>("cmd_import_wokwi_zip", { path, destDir });
 export const exportWokwiZip = (

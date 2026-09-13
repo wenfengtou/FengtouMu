@@ -13,6 +13,8 @@ export interface ProjectFile {
   version: number;
   name: string;
   updatedAt: string;
+  /** 创建时间（项目库条目用；外部 .fmp 可能缺失） */
+  createdAt?: string;
   /** Arduino 源码 */
   code: string;
   /** diagram.json 文本（Wokwi 兼容） */
@@ -21,6 +23,14 @@ export interface ProjectFile {
   fwDir: string;
   flashPath: string;
   fqbn: string;
+}
+
+/** 项目库条目元数据（不含内容，ProjectsModal 列表用） */
+export interface LibraryEntry {
+  id: string;
+  name: string;
+  updatedAt: string;
+  createdAt: string;
 }
 
 export interface RecentEntry {
@@ -62,6 +72,7 @@ export interface BuildProjectInput {
   flashPath: string;
   fqbn?: string;
   updatedAt?: string;
+  createdAt?: string;
 }
 
 /** 组装一份工程文件（时间戳默认取当前时间） */
@@ -70,6 +81,7 @@ export function buildProjectFile(input: BuildProjectInput): ProjectFile {
     version: PROJECT_VERSION,
     name: input.name || DEFAULT_PROJECT_NAME,
     updatedAt: input.updatedAt ?? new Date().toISOString(),
+    createdAt: input.createdAt ?? new Date().toISOString(),
     code: input.code,
     diagram: input.diagram,
     sketchDir: input.sketchDir,
@@ -130,6 +142,7 @@ export function parseProjectFile(text: string): { project: ProjectFile | null; e
     version: version || PROJECT_VERSION,
     name: str("name") || DEFAULT_PROJECT_NAME,
     updatedAt: str("updatedAt"),
+    createdAt: str("createdAt") || undefined,
     code: str("code"),
     diagram: str("diagram"),
     sketchDir: str("sketchDir"),

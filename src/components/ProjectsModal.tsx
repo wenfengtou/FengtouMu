@@ -1,42 +1,47 @@
 /**
  * Projects modal — list, open, delete, create new projects.
- * UI 与文案照抄 CircuitMuse 的 ProjectsModal，数据对接本地工程存储（recent 列表）。
+ * UI 与文案照抄 CircuitMuse 的 ProjectsModal，数据对接本地项目库
+ * （应用数据目录 projects/ 下的工程条目，自动保存/防抖写入）。
  */
 
 import { useEffect, useState } from "react";
-import { projectStore, openProjectPath, newProject, removeRecent, importWokwiProject } from "../state/projectStore";
+import {
+  deleteFromLibrary,
+  importWokwiProject,
+  newProject,
+  openFromLibrary,
+  projectStore,
+  refreshLibrary,
+} from "../state/projectStore";
 import { useStore } from "../state/store";
+import type { LibraryEntry } from "../project/format";
 
 interface ProjectsModalProps {
   onClose: () => void;
 }
 
-interface Entry {
-  path: string;
-  name: string;
-  openedAt: string;
-}
-
 export const ProjectsModal: React.FC<ProjectsModalProps> = ({ onClose }) => {
-  const recent = useStore(projectStore, (s) => s.recent);
-  const currentPath = useStore(projectStore, (s) => s.path);
-  const [entries, setEntries] = useState<Entry[]>([]);
+  const library = useStore(projectStore, (s) => s.library);
+  const libraryId = useStore(projectStore, (s) => s.libraryId);
+  const [entries, setEntries] = useState<LibraryEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setEntries(recent);
-    setLoading(false);
-  }, [recent]);
+    void refreshLibrary().then(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    setEntries(library);
+  }, [library]);
 
   const handleOpen = async (id: string) => {
-    await openProjectPath(id);
+    await openFromLibrary(id);
     onClose();
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this project?")) return;
-    await removeRecent(id);
-    setEntries((prev) => prev.filter((p) => p.path !== id));
+    await deleteFromLibrary(id);
   };
 
   const handleNew = () => {
@@ -47,6 +52,12 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({ onClose }) => {
   const handleImport = async () => {
     await importWokwiProject();
     onClose();
+  };
+
+  const fmtDate = (iso: string): string => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString();
   };
 
   return (
@@ -76,16 +87,20 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({ onClose }) => {
             </div>
           )}
           {entries.map((project) => (
-            <div key={project.path} className={`projects-item${project.path === currentPath ? " projects-item-current" : ""}`}>
-              <div className="projects-item-info" onClick={() => handleOpen(project.path)}>
+            <div
+              key={project.id}
+              className={`projects-item${project.id === libraryId ? " projects-item-current" : ""}`}
+            >
+              <div className="projects-item-info" onClick={() => handleOpen(project.id)}>
                 <div className="projects-item-name">{project.name || "Untitled"}</div>
                 <div className="projects-item-meta">
-                  {project.path} · {new Date(project.openedAt).toLocaleDateString()}
+                  Updated {fmtDate(project.updatedAt)}
+                  {project.id === libraryId ? " · current" : ""}
                 </div>
               </div>
               <button
                 className="projects-item-delete"
-                onClick={() => handleDelete(project.path)}
+                onClick={() => handleDelete(project.id)}
                 title="Delete project"
                 type="button"
               >

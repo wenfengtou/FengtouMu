@@ -18,6 +18,9 @@ pub struct Project {
     pub name: String,
     #[serde(default)]
     pub updated_at: String,
+    /// 创建时间（项目库条目用；外部 .fmp 可能缺失，空串即可）
+    #[serde(default)]
+    pub created_at: String,
     /// Arduino 源码（当前编辑器内容）
     #[serde(default)]
     pub code: String,
@@ -303,4 +306,73 @@ pub fn cmd_export_wokwi_zip(
         .map_err(|e| format!("写入 zip 失败: {e}"))?;
     zw.finish().map_err(|e| format!("完成 zip 失败: {e}"))?;
     Ok(())
+}
+
+// ---------------- 本地项目库（CircuitMuse 风格：应用数据目录下管理多个工程） ----------------
+
+/// 项目库条目元数据（不含内容，列表用）。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LibraryEntry {
+    pub id: String,
+    pub name: String,
+    pub updated_at: String,
+    pub created_at: String,
+}
+
+fn library_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = config_dir(app)?.join("projects");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("创建项目库目录失败: {e}"))?;
+    Ok(dir)
+}
+
+/// 列出项目库全部条目（按最近更新时间倒序）。只解析元数据，不加载内容。
+#[tauri::command]
+pub fn cmd_library_list(app: AppHandle) -> Result<Vec<LibraryEntry>, String> {
+    let dir = library_dir(&app)?;
+    let mut out: Vec<LibraryEntry> = Vec::new();
+    for e in std::fs::read_dir(&dir).map_err(|e| format!("读取项目库失败: {e}"))? {
+        let e = e.map_err(|e| format!("读取项目库条目失败: {e}"))?;
+        let p = e.path();
+        if p.extension().map(|x| x.eq_ignore_ascii_case("fmp")).unwrap_or(false) {
+            if let Some(id) = p.file_stem().map(|s| s.to_string_lossy().to_string()) {
+                let entry = match serde_json::from_str::<Project>(&read_text(&p)?) {
+                    Ok(proj) => LibraryEntry {
+                        id: id.clone(),
+                        name: proj.name,
+                        updated_at: proj.updated_at,
+                        created_at: proj.created_at,
+                    },
+                    Err(_) => LibraryEntry {
+                        id: id.clone(),
+                        name: id,
+                        updated_at: String::new(),
+                        created_at: String::new(),
+                    },
+                };
+                out.push(entry);
+            }
+        }
+    }
+    out.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    Ok(out)
+}
+
+/// 从项目库删除一个工程（按 id 删除对应的 .fmp 文件）。
+#[tauri::command]
+pub fn cmd_library_delete(app: AppHandle, id: String) -> Result<(), String> {
+    // 防路径穿越：id 只允许字母/数字/中划线/下划线
+    let safe: String = id
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .collect();
+    if safe.is_empty() || safe != id {
+        return Err("非法的项目 id".into());
+    }
+    let path = library_dir(&app)?.join(format!("{safe}.fmp"));
+    match std::fs::remove_file(&path) {
+        Ok(_) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(format!("删除项目库条目失败: {e}")),
+    }
 }
