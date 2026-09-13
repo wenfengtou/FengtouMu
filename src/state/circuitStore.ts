@@ -1,6 +1,6 @@
 /** 电路域：图纸数据、网表、元件外观、选中与连线状态 */
 
-import { CATALOG, pinAbsPos } from "../circuit/catalog";
+import { CATALOG } from "../circuit/catalog";
 import { computeVisuals, type BehaviorInput, type PartVisual } from "../circuit/behavior";
 import { parseDiagram, serializeDiagram } from "../circuit/diagram";
 import { buildNetlist, type Netlist } from "../circuit/netlist";
@@ -236,25 +236,12 @@ export function clickPin(ref: PinRef): void {
     circuitStore.set({ wiringFrom: null });
     return;
   }
-  // 自动生成正交初始路径（绕开其他元件包围盒），并让连线按信号类型着色
+  // A* 自动布线（绕开元件 + 既有导线），并让连线按信号类型着色
   const diagram = state.diagram;
-  const pFrom = diagram.parts.find((p) => p.id === from.part);
-  const pTo = diagram.parts.find((p) => p.id === ref.part);
-  const a = pFrom ? pinAbsPos(pFrom.type, pFrom.x, pFrom.y, from.pin) : null;
-  const b = pTo ? pinAbsPos(pTo.type, pTo.x, pTo.y, ref.pin) : null;
-  const obstacles = diagram.parts
-    .filter((p) => p.id !== from.part && p.id !== ref.part)
-    .map((p) => {
-      const def = CATALOG[p.type];
-      return { x: p.x, y: p.y, w: def.w, h: def.h };
-    });
   const conn: Connection = { from, to: ref };
-  if (a && b) {
-    const wps = autoRoute(a, b, obstacles);
-    if (wps.length > 0) conn.waypoints = wps;
-  }
-  const color = connectionColor(diagram, conn);
-  conn.color = color;
+  const wps = autoRoute(diagram, from, ref);
+  if (wps.length > 0) conn.waypoints = wps;
+  conn.color = connectionColor(diagram, conn);
   circuitStore.set((prev) => ({
     diagram: {
       ...prev.diagram,
