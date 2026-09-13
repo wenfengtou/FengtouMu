@@ -155,6 +155,12 @@ impl SimHost {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null());
+        // Windows 下禁止子进程创建控制台窗口（避免运行仿真时弹黑框）
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+        }
         if let Some(dll) = self.resolved_dll() {
             cmd.arg("--dll").arg(dll);
         }
