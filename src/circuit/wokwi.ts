@@ -17,6 +17,7 @@ import type { PartType } from "./types";
 
 /** 每种元件对应的 wokwi 自定义元素标签 */
 export const WOKWI_TAG: Partial<Record<PartType, string>> = {
+  "board-devkitc": "wokwi-esp32-devkit-v1",
   led: "wokwi-led",
   resistor: "wokwi-resistor",
   pushbutton: "wokwi-pushbutton",
@@ -27,6 +28,8 @@ export const WOKWI_TAG: Partial<Record<PartType, string>> = {
 
 /** 渲染尺寸（px，与 wokwi 元素自然尺寸一致，也是 catalog 里 w/h 的来源） */
 export const WOKWI_SIZE: Partial<Record<PartType, { w: number; h: number }>> = {
+  // 底板铺满 38 引脚布局矩形；官方 svg 用 preserveAspectRatio="none" 拉伸填充
+  "board-devkitc": { w: 210, h: 624 },
   led: { w: 40, h: 50 },
   resistor: { w: 59, h: 11 },
   pushbutton: { w: 67, h: 45 },
@@ -37,13 +40,13 @@ export const WOKWI_SIZE: Partial<Record<PartType, { w: number; h: number }>> = {
 
 /** 元件视觉状态（与 behavior.ts 的 PartVisual 对齐） */
 export type WokwiPartState =
+  | { kind: "board-devkitc"; ledOn: boolean }
   | { kind: "led"; lit: boolean; color: string }
   | { kind: "resistor"; value: string }
   | { kind: "pushbutton"; pressed: boolean }
   | { kind: "switch"; closed: boolean }
   | { kind: "buzzer"; on: boolean }
-  | { kind: "potentiometer"; value: number }
-  | { kind: "board-devkitc" };
+  | { kind: "potentiometer"; value: number };
 
 /** 按类型取回（缓存）一个 wokwi 元素实例 */
 const elCache = new Map<string, HTMLElement>();
@@ -74,6 +77,12 @@ function hiddenHolder(): HTMLDivElement {
 export function applyWokwiState(type: PartType, el: HTMLElement, state: unknown): void {
   const w = el as unknown as Record<string, unknown>;
   switch (type) {
+    case "board-devkitc": {
+      const s = state as Extract<WokwiPartState, { kind: "board-devkitc" }>;
+      w.led1 = !!s?.ledOn;
+      w.ledPower = true;
+      break;
+    }
     case "led": {
       const s = state as Extract<WokwiPartState, { kind: "led" }>;
       w.color = s?.color ?? "red";
@@ -133,6 +142,10 @@ export async function wokwiSvgClone(
     if (size) {
       clone.setAttribute("width", String(size.w));
       clone.setAttribute("height", String(size.h));
+    }
+    // 底板：官方图按我们的 38 引脚矩形拉伸铺满（引脚圆点覆盖在两侧）
+    if (type === "board-devkitc") {
+      clone.setAttribute("preserveAspectRatio", "none");
     }
   }
   host.removeChild(el);

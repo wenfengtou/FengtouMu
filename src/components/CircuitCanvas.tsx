@@ -24,6 +24,7 @@ import {
 } from "../state/circuitStore";
 import { simStore } from "../state/simStore";
 import { useStore } from "../state/store";
+import { PIN_LED } from "../lib/api";
 
 const SNAP = 10;
 const MIN_SCALE = 0.5;
@@ -201,22 +202,31 @@ export default function CircuitCanvas() {
     };
 
     switch (part.type) {
-      case "board-devkitc":
+      case "board-devkitc": {
+        // 板载 LED = GPIO2（与 BoardView 一致）
+        const ledState = pins.get(PIN_LED);
+        const ledOn = ledState?.value === 1 && ledState?.dir === 1;
         return (
           <g key={part.id} {...common} onMouseDown={selectOnDown}>
-            <rect
-              width={def.w}
-              height={def.h}
-              rx={10}
-              fill="#1b3a5e"
-              stroke={isSelected ? "#ffd54f" : "#3a6ea5"}
-            />
-            <text x={def.w / 2} y={20} textAnchor="middle" fontSize={11} fill="#9fd0ff">
-              ESP32 DevKitC
-            </text>
+            <WokwiPart type="board-devkitc" state={{ kind: "board-devkitc", ledOn }} />
+            {isSelected && (
+              <rect
+                x={-3}
+                y={-3}
+                width={def.w + 6}
+                height={def.h + 6}
+                rx={12}
+                fill="none"
+                stroke="#ffd54f"
+                strokeWidth={1.5}
+                strokeDasharray="5 3"
+                pointerEvents="none"
+              />
+            )}
             {def.pins.map((p) => pinNode(part, def.w, p.id, p.label, p.kind, p.boardPin))}
           </g>
         );
+      }
 
       case "led": {
         const visual = visuals.get(part.id);
