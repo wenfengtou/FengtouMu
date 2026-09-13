@@ -37,8 +37,10 @@ import {
 } from "../project/format";
 import { circuitStore, exportDiagramText, importDiagramText, resetCircuit } from "./circuitStore";
 import { editorStore, setCode, type EditorState } from "./editorStore";
+import { simStore, stopSim } from "./simStore";
 import { createStore } from "./store";
 import { setMsg } from "./uiStore";
+import { DEFAULT_SKETCH } from "../project/defaults";
 
 /** 自动保存间隔（毫秒） */
 const AUTOSAVE_INTERVAL_MS = 30_000;
@@ -312,11 +314,26 @@ export function initProject(): Promise<void> {
   })();
 }
 
-/** 新建工程：清空源码与电路图，但保留本机路径配置（fw 目录、固件镜像）；以新库条目登记 */
-export function newProject(): void {
+/** 新建工程（照抄 velxio/circuit-muse 交互：确认 → 停止仿真 → 清空 → 重置默认代码）。
+ * 返回是否真正新建（用户在确认框点取消时返回 false）。 */
+export async function newProject(): Promise<boolean> {
+  const st = projectStore.get();
+  const hasWork = st.dirty || editorStore.get().code !== DEFAULT_SKETCH;
+  if (hasWork) {
+    // Tauri 2 的 window.confirm 返回 Promise（原生对话框，异步），必须 await
+    const ok = await window.confirm(
+      "Start a new project? This clears every component, wire and file. This cannot be undone.",
+    );
+    if (!ok) return false;
+  }
+  // 停止仿真（幂等：未运行则 no-op），与 velxio newProject 一致
+  if (simStore.get().status === "running" || simStore.get().status === "loading" || simStore.get().status === "stopping") {
+    await stopSim();
+  }
   withDirtySuppressed(() => {
     resetCircuit();
   });
+  setCode(DEFAULT_SKETCH);
   projectStore.set({
     path: null,
     name: DEFAULT_PROJECT_NAME,
@@ -325,7 +342,8 @@ export function newProject(): void {
     libraryId: newLibraryId(),
   });
   void saveToLibrary();
-  setMsg("已新建工程（源码与电路图已重置，fw 目录与固件路径保留）");
+  setMsg("已新建工程（源码与电路图已重置）");
+  return true;
 }
 
 /** 打开指定路径的工程文件 */
@@ -368,13 +386,12 @@ export async function openProjectPath(path: string): Promise<void> {
   }
 }
 
-/** 弹出文件选择框打开工程（.vlx 为主；兼容旧 .fmp 与 Wokwi .zip） */
+/** 弹出文件选择框打开工程（.vlx 为主；.zip 走 Wokwi 导入） */
 export async function openProject(): Promise<void> {
   const file = await open({
     title: "打开工程",
     filters: [
       { name: "FengtouMu 工程 (.vlx)", extensions: [PROJECT_EXT] },
-      { name: "旧版工程 (.fmp)", extensions: ["fmp"] },
       { name: "Wokwi 工程 (.zip)", extensions: ["zip"] },
       { name: "工程 JSON", extensions: ["json"] },
     ],

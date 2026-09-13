@@ -44,9 +44,9 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({ onClose }) => {
     await deleteFromLibrary(id);
   };
 
-  const handleNew = () => {
-    newProject();
-    onClose();
+  const handleNew = async () => {
+    const created = await newProject();
+    if (created) onClose();
   };
 
   const handleImport = async () => {

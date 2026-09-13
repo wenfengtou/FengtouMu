@@ -697,6 +697,10 @@ if (!(await waitForUi())) {
   process.exit(2);
 }
 
+// Tauri 2 的 window.confirm 是原生对话框（返回 Promise），CDP 无法自动处理；
+// 自动化里注入桩函数直接放行，真实用户不受影响。
+await evalJs(`(() => { window.confirm = () => true; return true; })()`);
+
 let ready = false;
 for (let i = 0; i < 60; i++) {
   const p = await ui();

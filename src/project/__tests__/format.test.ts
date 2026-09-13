@@ -103,15 +103,12 @@ describe("parseProjectFile", () => {
     expect(project!.sketchDir).toBe("");
   });
 
-  it("兼容解析旧 .fmp（无 format 字段、无 files 数组）", () => {
+  it("缺少 format 字段（旧 .fmp）时拒绝", () => {
     const { project, errors } = parseProjectFile(
       '{"version":1,"name":"旧工程","code":"void loop(){}","diagram":"{\\"parts\\":[]}"}',
     );
-    expect(errors).toEqual([]);
-    expect(project).not.toBeNull();
-    expect(project!.format).toBe(VLX_FORMAT);
-    expect(project!.code).toBe("void loop(){}");
-    expect(project!.files).toEqual([]);
+    expect(project).toBeNull();
+    expect(errors.join(" ")).toContain("format");
   });
 
   it("非 JSON 文本给出可读错误", () => {
@@ -120,8 +117,10 @@ describe("parseProjectFile", () => {
     expect(errors[0]).toContain("不是合法的 JSON");
   });
 
-  it("缺字段但含 code 的文件按默认值补齐", () => {
-    const { project, errors } = parseProjectFile('{"version":1,"code":"void loop(){}"}');
+  it("缺字段但含 code 且带 format 的文件按默认值补齐", () => {
+    const { project, errors } = parseProjectFile(
+      '{"format":"fengtoumu-project","version":1,"code":"void loop(){}"}',
+    );
     expect(project).not.toBeNull();
     expect(project!.name).toBe(DEFAULT_PROJECT_NAME);
     expect(project!.fqbn).toBe(DEFAULT_FQBN);
@@ -129,8 +128,8 @@ describe("parseProjectFile", () => {
     expect(errors).toEqual([]);
   });
 
-  it("既无源码又无电路图时拒绝", () => {
-    const { project, errors } = parseProjectFile('{"version":1}');
+  it("带 format 但既无源码又无电路图时拒绝", () => {
+    const { project, errors } = parseProjectFile('{"format":"fengtoumu-project","version":1}');
     expect(project).toBeNull();
     expect(errors.join(" ")).toContain("不是工程文件");
   });

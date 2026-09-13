@@ -3,8 +3,8 @@
  *
  * `.vlx` 是自包含快照：源码文件（files[]）与电路图（diagram 文本）全部内嵌，
  * 不依赖任何外部目录路径 —— 文件拷到任何电脑/位置都能完整还原。
- * 兼容读取：旧 `.fmp`（无 format 字段的单文件 code 结构）与 velxio/circuit-muse
- * 的 `.vlx`（format: velxio-project / circuit-muse-project，fileGroups 结构）。
+ * 兼容读取：velxio/circuit-muse 的 `.vlx`（format: velxio-project /
+ * circuit-muse-project，fileGroups 结构）。旧 `.fmp` 不再支持（开发阶段直接切换）。
  *
  * 与 Rust 侧 `project.rs` 的 `Project` 结构一一对应（camelCase）。
  * 这里只做「组装 / 解析 / 校验」，不触碰任何界面或仿真状态，便于单元测试。
@@ -26,8 +26,8 @@ export interface ProjectFileEntry {
 
 /** 工程文件内容 */
 export interface ProjectFile {
-  /** 格式标识；本应用 `.vlx` 为 `fengtoumu-project`；旧 .fmp 无此字段 */
-  format?: string;
+  /** 格式标识；本应用 `.vlx` 为 `fengtoumu-project` */
+  format: string;
   version: number;
   name: string;
   updatedAt: string;
@@ -35,7 +35,7 @@ export interface ProjectFile {
   createdAt?: string;
   /** 源码文件列表（`.vlx` 自包含：名称 + 内容全部内嵌） */
   files: ProjectFileEntry[];
-  /** 当前主源码（编辑器内容；兼容旧 .fmp 的单文件字段） */
+  /** 当前主源码（编辑器内容） */
   code: string;
   /** diagram.json 文本（Wokwi 兼容） */
   diagram: string;
@@ -138,7 +138,7 @@ export function projectFileName(name: string): string {
 }
 
 /**
- * 解析工程文件文本（`.vlx`，兼容旧 `.fmp` 与 velxio/circuit-muse 的 `.vlx`）。
+ * 解析工程文件文本（`.vlx`，兼容 velxio/circuit-muse 的 `.vlx`）。
  * 返回 `project: null` 表示这不是一份可用的工程文件，具体原因在 `errors` 中。
  */
 export function parseProjectFile(text: string): { project: ProjectFile | null; errors: string[] } {
@@ -170,6 +170,10 @@ export function parseProjectFile(text: string): { project: ProjectFile | null; e
 
   // 识别 velxio / circuit-muse 的 .vlx：源码在 fileGroups 里，按组平铺
   const format = str("format");
+  if (!format) {
+    errors.push("缺少 format 字段，不是 .vlx 工程文件（旧版 .fmp 已不再支持，请用新格式另存）");
+    return { project: null, errors };
+  }
   let files: Array<{ name: string; content: string }> = [];
   let code = str("code");
   let diagram = str("diagram");
@@ -194,14 +198,13 @@ export function parseProjectFile(text: string): { project: ProjectFile | null; e
       code = ino ? ino.content : (files[0]?.content ?? "");
     }
     // 外部工程没有 FengtouMu 路径信息；若电路图缺失则给空（后续由 UI 提示仅代码可还原）
-    diagram = str("diagram");
     if (files.length > 0) {
       sketchDir = "";
       fwDir = "";
       flashPath = "";
     }
   } else {
-    // 本应用 .vlx（format=fengtoumu-project）或旧 .fmp（无 format）：files 数组为权威
+    // 本应用 .vlx（format=fengtoumu-project）：files 数组为权威
     if (o.files !== undefined) {
       for (const f of arr("files")) {
         const fo = f as Record<string, unknown>;
