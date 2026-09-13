@@ -404,21 +404,13 @@ export async function openProject(): Promise<void> {
   await openProjectPath(file);
 }
 
-/** 保存到当前路径；没有路径则转为"另存为" */
+/**
+ * 保存（照抄 velxio/circuit-muse：Save 总是弹出保存对话框，让用户选择位置导出 `.vlx`）。
+ * 平时编辑由 2s 防抖自动保存到本地项目库（对应 circuit-muse 的 IndexedDB 自动备份），
+ * 点 Save / Ctrl+S 则显式导出文件 —— 与两个参考项目行为一致。
+ */
 export async function saveProject(): Promise<void> {
-  const { path } = projectStore.get();
-  if (!path) {
-    await saveProjectAs();
-    return;
-  }
-  try {
-    await projectSave(path, snapshot());
-    projectStore.set({ dirty: false, lastSavedAt: Date.now(), session: null });
-    await persistPrefs();
-    setMsg(`已保存 ${path}`);
-  } catch (e) {
-    setMsg(`保存失败: ${e}`);
-  }
+  await saveProjectAs();
 }
 
 /** 另存为（`.vlx` 自包含快照） */
