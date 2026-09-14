@@ -404,16 +404,43 @@ export async function openProject(): Promise<void> {
   await openProjectPath(file);
 }
 
+/** 把当前工程内容写入指定 .vlx 路径（静默保存与另存为共用的落盘逻辑） */
+async function writeProject(path: string, name: string): Promise<boolean> {
+  try {
+    await projectSave(path, buildProjectFile({ ...snapshotInput(), name }));
+    projectStore.set({
+      path,
+      name,
+      dirty: false,
+      lastSavedAt: Date.now(),
+      session: null,
+    });
+    await persistPrefs();
+    void saveToLibrary();
+    setMsg(`已保存 ${path}`);
+    return true;
+  } catch (e) {
+    setMsg(`保存失败: ${e}`);
+    return false;
+  }
+}
+
 /**
- * 保存（照抄 velxio/circuit-muse：Save 总是弹出保存对话框，让用户选择位置导出 `.vlx`）。
- * 平时编辑由 2s 防抖自动保存到本地项目库（对应 circuit-muse 的 IndexedDB 自动备份），
- * 点 Save / Ctrl+S 则显式导出文件 —— 与两个参考项目行为一致。
+ * 保存（对齐 velxio/circuit-muse 的 "Save"）：
+ * 已有保存路径 → 静默覆盖保存到原路径，不再弹框；
+ * 新工程（尚无路径）→ 弹「另存为」对话框让用户选择导出位置。
+ * 日常编辑由 2s 防抖自动保存到本地项目库兜底。
  */
 export async function saveProject(): Promise<void> {
+  const st = projectStore.get();
+  if (st.path) {
+    await writeProject(st.path, st.name);
+    return;
+  }
   await saveProjectAs();
 }
 
-/** 另存为（`.vlx` 自包含快照） */
+/** 另存为（`.vlx` 自包含快照，总是弹对话框换位置） */
 export async function saveProjectAs(): Promise<void> {
   const st = projectStore.get();
   const path = await save({
@@ -423,28 +450,13 @@ export async function saveProjectAs(): Promise<void> {
   });
   if (typeof path !== "string") return;
   const name = projectNameFromPath(path);
-  try {
-    await projectSave(path, buildProjectFile({ ...snapshotInput(), name }));
-    const recent = touchRecent(st.recent, {
-      path,
-      name,
-      openedAt: new Date().toISOString(),
-    });
-    projectStore.set({
-      path,
-      name,
-      dirty: false,
-      recent,
-      lastSavedAt: Date.now(),
-      session: null,
-      libraryId: newLibraryId(),
-    });
-    await persistPrefs();
-    void saveToLibrary();
-    setMsg(`已保存 ${path}`);
-  } catch (e) {
-    setMsg(`保存失败: ${e}`);
-  }
+  if (!(await writeProject(path, name))) return;
+  const recent = touchRecent(st.recent, {
+    path,
+    name,
+    openedAt: new Date().toISOString(),
+  });
+  projectStore.set({ recent, libraryId: newLibraryId() });
 }
 
 /** 从最近工程列表移除记录（不删除磁盘文件），并持久化 */
