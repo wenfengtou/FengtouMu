@@ -1,9 +1,8 @@
 // FengtouMu UI 自动化验证（真实点击，经 WebView2 CDP）
 //
 // 用法：node scripts/ui_drive.mjs
-// 覆盖三条链路：
-//   A 板卡视图：运行 → 板载 LED 闪烁 → 停止
-//   B 电路图：放置 LED → 连线 D2/GND → 运行 → 画布上的 LED 闪烁 → 停止
+// 覆盖八条链路：
+//   B 电路图 LED：放置 LED → 连线 D2/GND → 运行 → 画布上的 LED 闪烁 → 停止
 //   C 电路图 + 按键：放置按键 → 连线 D0/GND → 运行 → 按住 → 界面按键状态更新 → 停止
 //   D 电路图 + 电位器：放置电位器 → SIG 接 D34 → 运行 → 拖动旋钮 → 读数改变且注入无报错 → 停止
 //   E 自动保存恢复：预置 autosave.vlx → 点「恢复上次编辑」→ 内容与工程名被整份灌回
@@ -167,13 +166,11 @@ async function waitForUi(timeoutMs = 90000) {
 }
 
 const probe = `(() => {
-  const boardEl = document.querySelector('.board-svg');
   const term = Array.from(document.querySelectorAll('.terminal-line')).map(e=>e.textContent).join('\\n');
   return {
     status: (document.querySelector('.status')||{}).textContent || '',
     msg: (document.querySelector('.msgbar')||{}).textContent || '',
     flash: (document.querySelector('.path')||{}).textContent || '',
-    boardLed: (boardEl && boardEl.querySelector('[data-board-led]')||{}).getAttribute?.('data-board-led') === '1',
     parts: document.querySelectorAll('[data-part]').length,
     wires: document.querySelectorAll('[data-wire]').length,
     runDisabled: (document.querySelector('.btn-run')||{}).disabled,
@@ -221,15 +218,27 @@ const clickSel = async (selector, dyRatio = 0.5) => {
   await clickAt(c.x, c.y);
 };
 
-async function openTab(name) {
-  // 新界面（CircuitMuse 风格）：画布头部有 Board / Circuit 分段切换
-  const view = name.includes("板卡") ? "board" : "circuit";
-  await evalJs(`(() => {
-    const btn = document.querySelector('[data-view=${JSON.stringify(view)}]');
-    if (btn) btn.click();
-    return !!btn;
+/**
+ * 点击引脚圆点本身（而非整个 <g> 的中心）。
+ * 带标签的引脚（如 esp:D2）其 <g> 包围盒包含文字，几何中心会落在圆点与文字之间的
+ * 空隙上（命中底板图像而不是引脚），导致 clickPin 不触发。直接点 <circle> 的中心最稳。
+ */
+async function clickPinSel(selector) {
+  const c = await evalJs(`(() => {
+    const g = document.querySelector(${JSON.stringify(selector)});
+    if (!g) return null;
+    const el = g.querySelector('circle');
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
   })()`);
-  await sleep(400);
+  if (!c) return clickSel(selector); // 兜底
+  await clickAt(c.x, c.y);
+}
+
+async function openTab() {
+  // 板卡视图已移除，右侧恒为电路图；保留调用点仅为兼容旧阶段顺序
+  await sleep(200);
 }
 
 /** 确保仿真处于停止状态：上一条链路若失败会残留运行状态，导致后续找不到[运行]按钮 */
@@ -337,38 +346,6 @@ async function stopOnce(label) {
   return { ok: false, why: "停止超时" };
 }
 
-/** A. 板卡视图：LED 闪烁 */
-async function stageBoard() {
-  await openTab("板卡视图");
-  await ensureStopped();
-  const r = await runOnce("A 板卡视图");
-  if (!r.ok) return r;
-  let last = null;
-  let flips = 0;
-  const t0 = Date.now();
-  while (Date.now() - t0 < LED_SAMPLE_MS) {
-    await sleep(150);
-    let p;
-    try {
-      p = await ui();
-    } catch {
-      return { ok: false, why: "运行中闪退" };
-    }
-    if (last !== null && p.boardLed !== last) flips += 1;
-    last = p.boardLed;
-  }
-  log(`A 板卡视图: LED 翻转 ${flips} 次`);
-  if (flips < 3) {
-    const p = await ui();
-    await stopOnce("A 板卡视图");
-    return {
-      ok: false,
-      why: `板卡 LED 未闪烁（${flips} 次）| 串口长度=${p.termLen} | 尾部=${JSON.stringify((p.termTail || "").split("\n").slice(-6).join(" / "))}`,
-    };
-  }
-  return stopOnce("A 板卡视图");
-}
-
 /** B. 电路图：放置 LED、连线、运行并观察画布 LED */
 async function stageCircuitLed() {
   await openTab("电路图");
@@ -377,10 +354,10 @@ async function stageCircuitLed() {
 
   await addPartViaPicker('led');
   const wires0 = (await ui()).wires;
-  await clickSel('[data-pin="led1:A"]');
-  await clickSel('[data-pin="esp:D2"]');
-  await clickSel('[data-pin="led1:C"]');
-  await clickSel('[data-pin="esp:GND.1"]');
+  await clickPinSel('[data-pin="led1:A"]');
+  await clickPinSel('[data-pin="esp:D2"]');
+  await clickPinSel('[data-pin="led1:C"]');
+  await clickPinSel('[data-pin="esp:GND.1"]');
   const wires1 = (await ui()).wires;
   log(`B 电路图: 导线 ${wires0} → ${wires1} 条`);
   if (wires1 !== wires0 + 2) return { ok: false, why: `连线失败（导线数 ${wires1}）` };
@@ -419,10 +396,10 @@ async function stageCircuitButton() {
   await openTab("电路图");
   await ensureStopped();
   await addPartViaPicker('pushbutton');
-  await clickSel('[data-pin="sw1:A"]');
-  await clickSel('[data-pin="esp:D0"]');
-  await clickSel('[data-pin="sw1:B"]');
-  await clickSel('[data-pin="esp:GND.1"]');
+  await clickPinSel('[data-pin="sw1:A"]');
+  await clickPinSel('[data-pin="esp:D0"]');
+  await clickPinSel('[data-pin="sw1:B"]');
+  await clickPinSel('[data-pin="esp:GND.1"]');
   const p0 = await ui();
   log(`C 按键: 当前导线 ${p0.wires} 条`);
   if (p0.wires !== 4) return { ok: false, why: `按键连线失败（导线数 ${p0.wires}）` };
@@ -465,12 +442,12 @@ async function stageCircuitPot() {
   await ensureStopped();
   await addPartViaPicker('potentiometer');
   const wires0 = (await ui()).wires;
-  await clickSel('[data-pin="pot1:SIG"]');
-  await clickSel('[data-pin="esp:D34"]');
-  await clickSel('[data-pin="pot1:VCC"]');
-  await clickSel('[data-pin="esp:3V3"]');
-  await clickSel('[data-pin="pot1:GND"]');
-  await clickSel('[data-pin="esp:GND.1"]');
+  await clickPinSel('[data-pin="pot1:SIG"]');
+  await clickPinSel('[data-pin="esp:D34"]');
+  await clickPinSel('[data-pin="pot1:VCC"]');
+  await clickPinSel('[data-pin="esp:3V3"]');
+  await clickPinSel('[data-pin="pot1:GND"]');
+  await clickPinSel('[data-pin="esp:GND.1"]');
   const p0 = await ui();
   log(`D 电位器: 导线 ${wires0} → ${p0.wires} 条`);
   if (p0.wires !== wires0 + 3) return { ok: false, why: `电位器连线失败（导线数 ${p0.wires}，期望 ${wires0 + 3}）` };
@@ -647,10 +624,10 @@ async function stageCircuitSwitch() {
   await ensureStopped();
   await addPartViaPicker('switch');
   const wires0 = (await ui()).wires;
-  await clickSel('[data-pin="tgl1:1"]');
-  await clickSel('[data-pin="esp:D0"]');
-  await clickSel('[data-pin="tgl1:2"]');
-  await clickSel('[data-pin="esp:GND.1"]');
+  await clickPinSel('[data-pin="tgl1:1"]');
+  await clickPinSel('[data-pin="esp:D0"]');
+  await clickPinSel('[data-pin="tgl1:2"]');
+  await clickPinSel('[data-pin="esp:GND.1"]');
   const p0 = await ui();
   log(`I 开关: 导线 ${wires0} → ${p0.wires} 条`);
   if (p0.wires !== wires0 + 2) return { ok: false, why: `开关连线失败（导线数 ${p0.wires}）` };
@@ -722,7 +699,6 @@ const init = await ui();
 log("初始状态:", JSON.stringify(init));
 
 const stages = [
-  ["A 板卡视图", stageBoard],
   ["B 电路图 LED", stageCircuitLed],
   ["C 电路图按键", stageCircuitButton],
   ["D 电路图电位器", stageCircuitPot],
@@ -752,5 +728,5 @@ if (failed.length > 0) {
   failed.forEach((f) => log("  - " + f));
   process.exit(2);
 }
-log("UI 自动化验证通过：板卡 LED、电路图 LED、按键注入、电位器注入、拨动开关、工程新建、环境自检、自动保存恢复、一键编译 九条链路全部成功");
+log("UI 自动化验证通过：电路图 LED、按键注入、电位器注入、拨动开关、工程新建、环境自检、自动保存恢复、一键编译 八条链路全部成功");
 process.exit(0);

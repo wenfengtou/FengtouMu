@@ -246,7 +246,7 @@ export default function CircuitCanvas() {
 
     switch (part.type) {
       case "board-devkitc": {
-        // 板载 LED = GPIO2（与 BoardView 一致）
+        // 板载 LED = GPIO2（DevKitC 上电后默认点亮）
         const ledState = pins.get(PIN_LED);
         const ledOn = ledState?.value === 1 && ledState?.dir === 1;
         return (

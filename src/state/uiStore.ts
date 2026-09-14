@@ -2,7 +2,6 @@
 
 import { createStore } from "./store";
 
-export type RightView = "board" | "circuit";
 export type ViewMode = "code" | "both" | "circuit";
 
 export interface CompileLog {
@@ -14,7 +13,6 @@ export interface CompileLog {
 export interface UiState {
   msg: string;
   busy: boolean;
-  view: RightView;
   /** Code / Both / Circuit 三态布局 */
   viewMode: ViewMode;
   explorerOpen: boolean;
@@ -31,7 +29,6 @@ export interface UiState {
 export const uiStore = createStore<UiState>({
   msg: "",
   busy: false,
-  view: "board",
   viewMode: "both",
   explorerOpen: true,
   consoleOpen: true,
@@ -43,7 +40,6 @@ export const uiStore = createStore<UiState>({
 
 export const setMsg = (msg: string): void => uiStore.set({ msg });
 export const setBusy = (busy: boolean): void => uiStore.set({ busy });
-export const setView = (view: RightView): void => uiStore.set({ view });
 export const setViewMode = (viewMode: ViewMode): void => uiStore.set({ viewMode });
 export const toggleExplorer = (): void =>
   uiStore.set((s) => ({ explorerOpen: !s.explorerOpen }));

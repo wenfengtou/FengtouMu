@@ -15,7 +15,6 @@ import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
 } from "react";
-import BoardView from "./components/BoardView";
 import CircuitPanel from "./components/CircuitPanel";
 import CodeEditor from "./components/CodeEditor";
 import CompilationConsole from "./components/CompilationConsole";
@@ -25,7 +24,6 @@ import EditorToolbar from "./components/EditorToolbar";
 import EnvPanel from "./components/EnvPanel";
 import FileExplorer from "./components/FileExplorer";
 import SerialMonitor from "./components/SerialMonitor";
-import { PIN_BOOT } from "./lib/api";
 import { initCircuitBridge } from "./state/bridge";
 import { circuitStore, setZoomCmd } from "./state/circuitStore";
 import { editorStore, setCode } from "./state/editorStore";
@@ -40,13 +38,12 @@ import {
   restoreSession,
   saveProject,
 } from "./state/projectStore";
-import { initSim, simStore, writePin } from "./state/simStore";
+import { initSim, simStore } from "./state/simStore";
 import { useStore } from "./state/store";
 import {
   setMsg,
   setPickerOpen,
   setSerialOpen,
-  setView,
   setViewMode,
   toggleExplorer,
   uiStore,
@@ -86,10 +83,8 @@ const VIEW_MODES: { key: ViewMode; label: string; path: string }[] = [
 
 function App() {
   const code = useStore(editorStore, (s) => s.code);
-  const pins = useStore(simStore, (s) => s.pins);
   const status = useStore(simStore, (s) => s.status);
   const msg = useStore(uiStore, (s) => s.msg);
-  const view = useStore(uiStore, (s) => s.view);
   const viewMode = useStore(uiStore, (s) => s.viewMode);
   const explorerOpen = useStore(uiStore, (s) => s.explorerOpen);
   const consoleOpen = useStore(uiStore, (s) => s.consoleOpen);
@@ -281,40 +276,6 @@ function App() {
           <div className="canvas-header canvas-header--portaled">
             <div className="canvas-header-left">
               <span className={`status-dot ${running ? "running" : "stopped"}`} title={running ? "Running" : "Stopped"} />
-              <div className="canvas-view-toggle" role="group" aria-label="View">
-                <button
-                  data-view="board"
-                  onClick={() => setView("board")}
-                  style={{
-                    background: view === "board" ? "#0e639c" : "transparent",
-                    color: view === "board" ? "#fff" : "#aaa",
-                    border: "none",
-                    height: 28,
-                    padding: "0 10px",
-                    cursor: "pointer",
-                    fontSize: 12,
-                    fontFamily: "inherit",
-                  }}
-                >
-                  Board
-                </button>
-                <button
-                  data-view="circuit"
-                  onClick={() => setView("circuit")}
-                  style={{
-                    background: view === "circuit" ? "#0e639c" : "transparent",
-                    color: view === "circuit" ? "#fff" : "#aaa",
-                    border: "none",
-                    height: 28,
-                    padding: "0 10px",
-                    cursor: "pointer",
-                    fontSize: 12,
-                    fontFamily: "inherit",
-                  }}
-                >
-                  Circuit
-                </button>
-              </div>
               <select className="board-selector" disabled title="Active board">
                 <option>ESP32 DevKitC V1</option>
               </select>
@@ -350,7 +311,7 @@ function App() {
                   </svg>
                 </button>
               </div>
-              <button className="add-component-btn" onClick={() => { setView("circuit"); setPickerOpen(true); }} title="Add Component">
+              <button className="add-component-btn" onClick={() => setPickerOpen(true)} title="Add Component">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                   <line x1="12" y1="5" x2="12" y2="19" />
                   <line x1="5" y1="12" x2="19" y2="12" />
@@ -420,11 +381,7 @@ function App() {
           style={{ width: simWidth, display: viewMode === "code" ? "none" : "flex", flexDirection: "column" }}
         >
           <div style={{ flex: 1, overflow: "hidden", position: "relative", minHeight: 0 }}>
-            {view === "board" ? (
-              <BoardView pins={pins} onBootPress={(pressed) => void writePin(PIN_BOOT, pressed ? 0 : 1)} />
-            ) : (
-              <CircuitPanel />
-            )}
+            <CircuitPanel />
           </div>
           {serialOpen && (
             <>

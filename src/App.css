@@ -295,65 +295,6 @@ button:disabled {
   min-height: 0;
 }
 
-.board-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: auto;
-  background: var(--bg);
-}
-
-/* ---- 板卡视图 ---- */
-.board-wrap {
-  padding: 8px;
-}
-
-.board-svg {
-  max-width: 100%;
-  height: auto;
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-/* ---- 右侧面板标签页（板卡视图 / 电路图）---- */
-.pane-tabs {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.pane-tabs .tab {
-  background: transparent;
-  color: var(--text-dim);
-  border: 1px solid transparent;
-  border-radius: 4px;
-  padding: 2px 10px;
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: none;
-  letter-spacing: 0;
-  cursor: pointer;
-  transition: color 0.12s, background 0.12s;
-}
-
-.pane-tabs .tab:hover {
-  color: #e8e8e8;
-  background: var(--bg-panel2);
-}
-
-.pane-tabs .tab.active {
-  color: #fff;
-  background: var(--accent-soft);
-  border-color: var(--accent);
-}
-
-.board-body-circuit {
-  align-items: stretch;
-  justify-content: flex-start;
-}
-
 /* ---- 电路图面板 ---- */
 .circuit-panel {
   display: flex;

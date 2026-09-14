@@ -9,7 +9,7 @@ import type { PartType } from "../circuit/types";
 import { applyWokwiState, wokwiElement } from "../circuit/wokwi";
 import { addPart, circuitStore, nextSlot } from "../state/circuitStore";
 import { useStore } from "../state/store";
-import { setMsg, setPickerOpen, setView, uiStore } from "../state/uiStore";
+import { setMsg, setPickerOpen, uiStore } from "../state/uiStore";
 
 const ORDER: PartType[] = ["led", "resistor", "pushbutton", "switch", "buzzer", "potentiometer"];
 
@@ -121,7 +121,6 @@ export default function ComponentPicker() {
     const slot = nextSlot(circuitStore.get().diagram);
     const id = addPart(type, slot.x, slot.y);
     setMsg(`已添加 ${NAME[type]}（${id}），可拖动调整位置`);
-    setView("circuit");
     setPickerOpen(false);
   };
 
