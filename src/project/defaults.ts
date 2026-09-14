@@ -16,11 +16,12 @@ void setup() {
 }
 
 void loop() {
-  // 每 500ms 翻转 LED
+  // 每 500ms 翻转 LED，并在串口打印状态（供串口监视器观察）
   if (millis() - lastToggle >= 500) {
     ledState = !ledState;
     digitalWrite(LED_PIN, ledState);
     lastToggle = millis();
+    Serial.println(ledState ? "LED 亮" : "LED 灭");
   }
 
   // 按键按下（低电平有效）时点亮 LED
