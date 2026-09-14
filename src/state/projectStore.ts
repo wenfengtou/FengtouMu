@@ -40,7 +40,7 @@ import { editorStore, setCode, type EditorState } from "./editorStore";
 import { simStore, stopSim } from "./simStore";
 import { createStore } from "./store";
 import { setMsg } from "./uiStore";
-import { DEFAULT_SKETCH } from "../project/defaults";
+import { DEFAULT_DIAGRAM, DEFAULT_SKETCH } from "../project/defaults";
 
 /** 自动保存间隔（毫秒） */
 const AUTOSAVE_INTERVAL_MS = 30_000;
@@ -331,7 +331,9 @@ export async function newProject(): Promise<boolean> {
     await stopSim();
   }
   withDirtySuppressed(() => {
-    resetCircuit();
+    // 默认电路：底板 + LED（阳极接 D4/GPIO4，阴极接 GND）—— 与 DEFAULT_SKETCH 的 LED_PIN 4 对应
+    const errors = importDiagramText(DEFAULT_DIAGRAM);
+    if (errors.length > 0) setMsg(`默认电路有 ${errors.length} 处问题：${errors.slice(0, 3).join("；")}`);
   });
   setCode(DEFAULT_SKETCH);
   projectStore.set({

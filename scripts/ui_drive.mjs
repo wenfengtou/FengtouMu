@@ -2,12 +2,12 @@
 //
 // 用法：node scripts/ui_drive.mjs
 // 覆盖八条链路：
-//   B 电路图 LED：放置 LED → 连线 D2/GND → 运行 → 画布上的 LED 闪烁 → 停止
+//   B 默认电路：新建工程应预置 LED（阳极 D4/阴极 GND）→ 运行 → 画布上的 LED 闪烁 → 停止
 //   C 电路图 + 按键：放置按键 → 连线 D0/GND → 运行 → 按住 → 界面按键状态更新 → 停止
 //   D 电路图 + 电位器：放置电位器 → SIG 接 D34 → 运行 → 拖动旋钮 → 读数改变且注入无报错 → 停止
 //   E 自动保存恢复：预置 autosave.vlx → 点「恢复上次编辑」→ 内容与工程名被整份灌回
 //   H 一键编译：点「编译」→ arduino-cli 产出合并镜像、固件路径切到 *.ino.merged.bin
-//   F 工程工具条：点「新建」→ 电路图与导线清空、标题回到未命名工程
+//   F 工程工具条：点「新建」→ 默认电路（底板+LED，D4/GND）就位、标题回到未命名工程
 //   G 环境自检：点「环境自检」→ 面板列出全部检查项且本机无缺失
 //   H 一键编译：点「编译」→ arduino-cli 产出合并镜像、固件路径切到 *.ino.merged.bin
 //
@@ -346,24 +346,35 @@ async function stopOnce(label) {
   return { ok: false, why: "停止超时" };
 }
 
-/** B. 电路图：放置 LED、连线、运行并观察画布 LED */
+/** B. 默认电路：新建工程应预置 LED（阳极 D4 / 阴极 GND），运行后画布 LED 闪烁（验证 D4 驱动外部 LED） */
 async function stageCircuitLed() {
-  await openTab("电路图");
+  await openTab();
   await ensureStopped();
+  // 新建工程 → 默认电路（底板 + LED，LED 已连 D4 与 GND）
+  await clickSel('[data-action="new"]');
+  await sleep(700);
   await zoomOut(8);
 
-  await addPartViaPicker('led');
-  const wires0 = (await ui()).wires;
-  await clickPinSel('[data-pin="led1:A"]');
-  await clickPinSel('[data-pin="esp:D2"]');
-  await clickPinSel('[data-pin="led1:C"]');
-  await clickPinSel('[data-pin="esp:GND.1"]');
-  const wires1 = (await ui()).wires;
-  log(`B 电路图: 导线 ${wires0} → ${wires1} 条`);
-  if (wires1 !== wires0 + 2) return { ok: false, why: `连线失败（导线数 ${wires1}）` };
+  const init = await ui();
+  log(`B 默认电路: 新建后 元件 ${init.parts} / 导线 ${init.wires}`);
+  if (init.parts < 2) return { ok: false, why: `默认电路未预置 LED（元件 ${init.parts}）` };
+  if (init.wires < 2) return { ok: false, why: `默认电路未预置连线（导线 ${init.wires}）` };
   await assertWokwiArt("led1");
 
-  const r = await runOnce("B 电路图");
+  // 先编译默认工程（确保固件 = 当前 DEFAULT_SKETCH，D4 驱动 LED；不编译会跑 build_demo 里的旧 bin）
+  await clickSel('[data-action="compile"]');
+  let compiled = false;
+  const cDeadline = Date.now() + 240000;
+  while (Date.now() < cDeadline) {
+    await sleep(1000);
+    const msg = await evalJs(`(document.querySelector('.msgbar')||{}).textContent || ''`);
+    if (msg.includes("编译成功")) { compiled = true; break; }
+    if (msg.includes("编译失败")) break;
+  }
+  if (!compiled) return { ok: false, why: "默认工程编译失败" };
+  log("B 默认电路: 编译成功");
+
+  const r = await runOnce("B 默认电路");
   if (!r.ok) return r;
 
   let last = null;
@@ -380,15 +391,15 @@ async function stageCircuitLed() {
     if (last !== null && lit !== last) flips += 1;
     last = lit;
   }
-  log(`B 电路图: 画布 LED 翻转 ${flips} 次`);
+  log(`B 默认电路: 画布 LED（D4）翻转 ${flips} 次`);
   if (flips < 3) {
     const p = await ui();
     return {
       ok: false,
-      why: `画布 LED 未闪烁（${flips} 次）| 串口长度=${p.termLen} | 尾部=${JSON.stringify((p.termTail || "").split("\n").slice(-4).join(" / "))}`,
+      why: `默认电路 LED 未闪烁（${flips} 次）| 串口长度=${p.termLen} | 尾部=${JSON.stringify((p.termTail || "").split("\n").slice(-4).join(" / "))}`,
     };
   }
-  return stopOnce("B 电路图");
+  return stopOnce("B 默认电路");
 }
 
 /** C. 电路图 + 按键：验证按下时界面状态与注入调用（固件侧输入保持受限，见开发日志） */
@@ -504,8 +515,9 @@ async function stageProjectBar() {
   await sleep(600);
   const after = await ui();
   log(`F 工程: 新建后 元件 ${after.parts} 个 / 导线 ${after.wires} 条 / 标题「${after.projectTitle}」`);
-  if (after.wires !== 0) return { ok: false, why: `新建后导线未清空（${after.wires} 条）` };
-  if (after.parts !== 1) return { ok: false, why: `新建后应只剩底板（当前 ${after.parts} 个元件）` };
+  // 新建后默认电路 = 底板 + LED（阳极 D4 / 阴极 GND），共 2 元件 2 连线
+  if (after.wires !== 2) return { ok: false, why: `新建后导线应为 2（LED-D4/GND），当前 ${after.wires} 条` };
+  if (after.parts !== 2) return { ok: false, why: `新建后应为底板+LED（当前 ${after.parts} 个元件）` };
   if (!after.msg.includes("已新建工程")) return { ok: false, why: `未出现新建提示：${after.msg}` };
   return { ok: true };
 }
@@ -558,7 +570,13 @@ async function stageEnvCheck() {
 
 /** G. 自动保存恢复：预置一份 autosave.vlx，点「恢复上次编辑」应把它整份灌回 */
 async function stageRestoreSession() {
-  const has = await evalJs(`!!document.querySelector('[data-action="restore-session"]')`);
+  // initProject 异步读 autosave.vlx，恢复按钮可能晚于 [运行] 就绪出现，轮询等待
+  let has = false;
+  for (let i = 0; i < 25; i++) {
+    has = await evalJs(`!!document.querySelector('[data-action="restore-session"]')`);
+    if (has) break;
+    await sleep(300);
+  }
   if (!has) return { ok: false, why: "未出现「恢复上次编辑」按钮（预置的自动保存内容未被识别）" };
   await clickSel('[data-action="restore-session"]');
   await sleep(900);
@@ -699,10 +717,11 @@ const init = await ui();
 log("初始状态:", JSON.stringify(init));
 
 const stages = [
-  ["B 电路图 LED", stageCircuitLed],
+  // 恢复链路必须排在最前：B 阶段「新建工程」会清掉 session（恢复标记），放后面就再也看不到恢复按钮
+  ["E 自动保存恢复", stageRestoreSession],
+  ["B 默认电路", stageCircuitLed],
   ["C 电路图按键", stageCircuitButton],
   ["D 电路图电位器", stageCircuitPot],
-  ["E 自动保存恢复", stageRestoreSession],
   ["F 工程工具条", stageProjectBar],
   ["G 环境自检", stageEnvCheck],
   ["H 一键编译", stageCompile],

@@ -1,8 +1,7 @@
 /** 工程级默认内容：新建工程时的示例源码。 */
 
-export const DEFAULT_SKETCH = `// ESP32 GPIO 演示：LED 闪烁 + 按键控制
-// 板载 LED 接 GPIO2，BOOT 按键接 GPIO0
-#define LED_PIN 2
+export const DEFAULT_SKETCH = `// ESP32 GPIO 演示：外部 LED 接 D4（GPIO4），BOOT 按键接 GPIO0
+#define LED_PIN 4
 #define BOOT_PIN 0
 
 int ledState = LOW;
@@ -31,3 +30,16 @@ void loop() {
   delay(10);
 }
 `;
+
+/** 新建工程时的默认电路图（Wokwi 格式）：LED 阳极接 D4（GPIO4），阴极接 GND。 */
+export const DEFAULT_DIAGRAM = `{
+  "version": 1,
+  "parts": [
+    { "type": "board-esp32-devkitc", "id": "esp", "top": 40, "left": 40, "attrs": {} },
+    { "type": "wokwi-led", "id": "led1", "top": 260, "left": 520, "attrs": { "color": "red" } }
+  ],
+  "connections": [
+    ["led1:A", "esp:D4", "green", []],
+    ["led1:C", "esp:GND.1", "green", []]
+  ]
+}`;
