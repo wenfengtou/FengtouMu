@@ -20,7 +20,6 @@ import {
   openProject,
   projectStore,
   restoreSession,
-  saveProject,
   saveProjectAs,
 } from "../state/projectStore";
 import { simStore, startSim, stopSim } from "../state/simStore";
@@ -53,18 +52,6 @@ export default function EditorToolbar() {
     window.addEventListener("mousedown", onClickOutside);
     return () => window.removeEventListener("mousedown", onClickOutside);
   }, [moreOpen]);
-
-  // Ctrl+S 保存（照抄 CircuitMuse：注册 keydown 快捷键）
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-        e.preventDefault();
-        void saveProject();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
 
   const resetSim = () => {
     void stopSim().then(() => {
