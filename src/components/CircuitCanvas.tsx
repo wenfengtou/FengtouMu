@@ -199,6 +199,10 @@ export default function CircuitCanvas() {
         ? "#ffd54f"
         : "#6d8fb0"
       : undefined;
+    // 底板引脚：官方 svg 自带丝印文字，再叠一层标签会叠字（对齐 velxio/circuit-muse：
+    // 它们用官方 svg 原图 + 透明引脚方块，名字只在 tooltip）。因此底板不渲染文字，
+    // 用 <title> 悬停提示；非底板元件（LED/按键/开关/电位器…）保留引脚旁的小字。
+    const isBoardPin = boardPin !== undefined;
     return (
       <g
         key={pinId}
@@ -209,6 +213,7 @@ export default function CircuitCanvas() {
           clickPin({ part: part.id, pin: pinId });
         }}
       >
+        {label ? <title>{label}</title> : null}
         <circle
           cx={def.x}
           cy={def.y}
@@ -216,7 +221,7 @@ export default function CircuitCanvas() {
           fill={active ?? gpioPinFill(boardPin, kind)}
           stroke="#0d1f33"
         />
-        {label ? (
+        {label && !isBoardPin ? (
           <text
             x={def.x < defW / 2 ? def.x + 8 : def.x - 8}
             y={def.y + 3}
