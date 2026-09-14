@@ -155,9 +155,11 @@ const BOARD_SPECIAL: Record<number, { id: string; label: string; kind: PartPinDe
 };
 
 const BOARD_W = 210;
-const BOARD_H = 624;
-const PIN_PITCH = 30;
-const PIN_TOP = 30;
+// 高度与 wokwi-esp32-devkit-v1 官方 svg 等比（107:201 ≈ 210:395），
+// 这样 preserveAspectRatio="none" 拉伸 = 等比缩放，板子不会变形。
+const BOARD_H = 395;
+const PIN_PITCH = 20;
+const PIN_TOP = 20;
 
 /** 板级引脚号 → 相对底板左上角的坐标（左列 1..19，右列 20..38 自下而上） */
 export function boardPinPos(boardPin: number): { x: number; y: number } {

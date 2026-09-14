@@ -24,7 +24,7 @@ import {
 } from "../lib/api";
 import { editorStore } from "./editorStore";
 import { createStore } from "./store";
-import { setMsg } from "./uiStore";
+import { setBusy, setMsg } from "./uiStore";
 
 export interface SimState {
   /** 供界面展示的 DLL 状态文本 */
@@ -121,20 +121,24 @@ export async function pickDllFile(): Promise<void> {
 }
 
 export async function startSim(): Promise<void> {
-  const { flashPath, fwDir } = editorStore.get();
-  if (!simStore.get().ready) {
-    const ok = await dllLoaded().catch(() => false);
-    if (!ok) {
-      setMsg("请先准备 libqemu-xtensa.dll");
-      return;
-    }
-  }
-  setMsg("正在启动仿真…");
+  // 点击即置忙：按钮立即变灰，避免"点了没反应"的卡顿感（照抄 velxio/circuit-muse 的 setCompiling(true) 放第一行）
+  setBusy(true);
   try {
+    const { flashPath, fwDir } = editorStore.get();
+    if (!simStore.get().ready) {
+      const ok = await dllLoaded().catch(() => false);
+      if (!ok) {
+        setMsg("请先准备 libqemu-xtensa.dll");
+        return;
+      }
+    }
+    setMsg("正在启动仿真…");
     await simStart(flashPath, fwDir);
     setMsg("仿真已启动");
   } catch (e) {
     setMsg(`启动失败: ${e}`);
+  } finally {
+    setBusy(false);
   }
 }
 

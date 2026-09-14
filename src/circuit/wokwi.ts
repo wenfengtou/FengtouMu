@@ -28,8 +28,8 @@ export const WOKWI_TAG: Partial<Record<PartType, string>> = {
 
 /** 渲染尺寸（px，与 wokwi 元素自然尺寸一致，也是 catalog 里 w/h 的来源） */
 export const WOKWI_SIZE: Partial<Record<PartType, { w: number; h: number }>> = {
-  // 底板铺满 38 引脚布局矩形；官方 svg 用 preserveAspectRatio="none" 拉伸填充
-  "board-devkitc": { w: 210, h: 624 },
+  // 底板尺寸与官方 svg 等比（107:201 ≈ 210:395），拉伸为等比缩放不变形
+  "board-devkitc": { w: 210, h: 395 },
   led: { w: 40, h: 50 },
   resistor: { w: 59, h: 11 },
   pushbutton: { w: 67, h: 45 },
