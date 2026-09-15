@@ -1,6 +1,6 @@
 /** 工程级默认内容：新建工程时的示例源码。 */
 
-export const DEFAULT_SKETCH = `// ESP32 GPIO 演示：外部 LED 接 D4（GPIO4），BOOT 按键接 GPIO0
+export const DEFAULT_SKETCH = `// ESP32 GPIO 演示：外部 LED 串 220Ω 限流电阻接 D4（GPIO4），BOOT 按键接 GPIO0
 #define LED_PIN 4
 #define BOOT_PIN 0
 
@@ -31,15 +31,17 @@ void loop() {
 }
 `;
 
-/** 新建工程时的默认电路图（Wokwi 格式）：LED 阳极接 D4（GPIO4），阴极接 GND。 */
+/** 新建工程时的默认电路图（Wokwi 格式）：LED 串 220Ω 限流电阻接 D4（GPIO4），阴极接 GND。 */
 export const DEFAULT_DIAGRAM = `{
   "version": 1,
   "parts": [
     { "type": "board-esp32-devkitc", "id": "esp", "top": 40, "left": 40, "attrs": {} },
-    { "type": "wokwi-led", "id": "led1", "top": 260, "left": 520, "attrs": { "color": "red" } }
+    { "type": "wokwi-resistor", "id": "r1", "top": 180, "left": 340, "attrs": { "resistance": "220" } },
+    { "type": "wokwi-led", "id": "led1", "top": 240, "left": 460, "attrs": { "color": "red" } }
   ],
   "connections": [
-    ["led1:A", "esp:D4", "green", []],
-    ["led1:C", "esp:GND.1", "green", []]
+    ["esp:D4", "r1:a", "green", [[260, 300], [260, 186], [340, 186]]],
+    ["r1:b", "led1:A", "green", [[520, 186], [520, 282], [485, 282]]],
+    ["led1:C", "esp:GND.1", "green", [[455, 282], [455, 460], [50, 460], [50, 320]]]
   ]
 }`;

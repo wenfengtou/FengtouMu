@@ -308,15 +308,14 @@ export function initProject(): Promise<void> {
       void autosave();
     }, AUTOSAVE_INTERVAL_MS);
 
+    // 打开应用即展示默认工作区（默认代码 + 默认电路：LED 阳极接 D4/GPIO4、阴极接 GND），
+    // 与 velxio/circuit-muse 打开即见默认电路一致；上次未保存的编辑以横幅形式提供恢复
+    withDirtySuppressed(() => {
+      importDiagramText(DEFAULT_DIAGRAM);
+      setCode(DEFAULT_SKETCH);
+    });
     if (session) {
       setMsg("检测到上次未保存的编辑，可在「工程 → 恢复上次」中找回");
-    } else {
-      // 无上次会话可恢复：直接展示默认工作区（默认代码 + 默认电路：LED 阳极接 D4/GPIO4、阴极接 GND），
-      // 与 velxio/circuit-muse 打开即见默认电路的行为一致
-      withDirtySuppressed(() => {
-        importDiagramText(DEFAULT_DIAGRAM);
-        setCode(DEFAULT_SKETCH);
-      });
     }
   })();
 }

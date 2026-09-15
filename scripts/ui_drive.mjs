@@ -2,12 +2,12 @@
 //
 // 用法：node scripts/ui_drive.mjs
 // 覆盖八条链路：
-//   B 默认电路：新建工程应预置 LED（阳极 D4/阴极 GND）→ 运行 → 画布上的 LED 闪烁 → 停止
+//   B 默认电路：新建工程应预置 LED（串 220Ω 电阻，阳极接 D4/阴极接 GND）→ 运行 → 画布上的 LED 闪烁 → 停止
 //   C 电路图 + 按键：放置按键 → 连线 D0/GND → 运行 → 按住 → 界面按键状态更新 → 停止
 //   D 电路图 + 电位器：放置电位器 → SIG 接 D34 → 运行 → 拖动旋钮 → 读数改变且注入无报错 → 停止
 //   E 自动保存恢复：预置 autosave.vlx → 点「恢复上次编辑」→ 内容与工程名被整份灌回
 //   H 一键编译：点「编译」→ arduino-cli 产出合并镜像、固件路径切到 *.ino.merged.bin
-//   F 工程工具条：点「新建」→ 默认电路（底板+LED，D4/GND）就位、标题回到未命名工程
+//   F 工程工具条：点「新建」→ 默认电路（底板+220Ω电阻+LED，D4/GND）就位、标题回到未命名工程
 //   G 环境自检：点「环境自检」→ 面板列出全部检查项且本机无缺失
 //   H 一键编译：点「编译」→ arduino-cli 产出合并镜像、固件路径切到 *.ino.merged.bin
 //
@@ -406,6 +406,7 @@ async function stageCircuitLed() {
 async function stageCircuitButton() {
   await openTab("电路图");
   await ensureStopped();
+  const wires0 = (await ui()).wires;
   await addPartViaPicker('pushbutton');
   await clickPinSel('[data-pin="sw1:A"]');
   await clickPinSel('[data-pin="esp:D0"]');
@@ -413,7 +414,7 @@ async function stageCircuitButton() {
   await clickPinSel('[data-pin="esp:GND.1"]');
   const p0 = await ui();
   log(`C 按键: 当前导线 ${p0.wires} 条`);
-  if (p0.wires !== 4) return { ok: false, why: `按键连线失败（导线数 ${p0.wires}）` };
+  if (p0.wires !== wires0 + 2) return { ok: false, why: `按键连线失败（导线数 ${p0.wires}）` };
   await assertWokwiArt("sw1");
 
   const r = await runOnce("C 按键");
@@ -515,9 +516,9 @@ async function stageProjectBar() {
   await sleep(600);
   const after = await ui();
   log(`F 工程: 新建后 元件 ${after.parts} 个 / 导线 ${after.wires} 条 / 标题「${after.projectTitle}」`);
-  // 新建后默认电路 = 底板 + LED（阳极 D4 / 阴极 GND），共 2 元件 2 连线
-  if (after.wires !== 2) return { ok: false, why: `新建后导线应为 2（LED-D4/GND），当前 ${after.wires} 条` };
-  if (after.parts !== 2) return { ok: false, why: `新建后应为底板+LED（当前 ${after.parts} 个元件）` };
+  // 新建后默认电路 = 底板 + 220Ω 电阻 + LED（D4→r1→LED 阳极，阴极接 GND），共 3 元件 3 连线
+  if (after.wires !== 3) return { ok: false, why: `新建后导线应为 3（D4→电阻→LED/GND），当前 ${after.wires} 条` };
+  if (after.parts !== 3) return { ok: false, why: `新建后应为底板+电阻+LED（当前 ${after.parts} 个元件）` };
   if (!after.msg.includes("已新建工程")) return { ok: false, why: `未出现新建提示：${after.msg}` };
   return { ok: true };
 }
